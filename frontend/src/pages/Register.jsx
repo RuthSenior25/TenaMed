@@ -418,13 +418,14 @@ const Register = () => {
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
 
-          {/* Login Link */}
+         {/* Login Link */}
 <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
   Already have an account?{' '}
   <Link
     to="/login"
     onClick={(e) => {
       e.preventDefault();
+      e.stopPropagation(); // Prevent form submission
       navigate('/login');
     }}
     className="font-medium text-blue-600 dark:text-blue-300 hover:text-blue-500 hover:underline"
