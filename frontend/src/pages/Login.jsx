@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
 
 const Login = () => {
   const { login } = useAuth();
@@ -18,54 +19,79 @@ const Login = () => {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
+    clearErrors
   } = useForm();
+
+  useEffect(() => {
+    // Clear any existing errors when component mounts
+    clearErrors();
+  }, []);
 
   const onSubmit = async (data) => {
     setFeedback(null);
     setIsLoading(true);
-    const result = await login(data);
-    if (result.success) {
-      navigate(from, { replace: true });
-    } else if (result.message) {
-      setFeedback({ type: 'error', message: result.message });
+    
+    try {
+      const result = await login(data);
+      
+      if (result.success) {
+        toast.success('Login successful! Redirecting...', { duration: 2000 });
+        setTimeout(() => {
+          navigate(from, { replace: true });
+        }, 1500);
+      } else {
+        const errorMessage = result.message || 'Login failed. Please check your credentials.';
+        setFeedback({ type: 'error', message: errorMessage });
+        toast.error(errorMessage, { duration: 4000 });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.message || 'An error occurred during login. Please try again.';
+      setFeedback({ type: 'error', message: errorMessage });
+      toast.error(errorMessage, { duration: 4000 });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-emerald-500 via-teal-500 to-sky-600 dark:from-slate-950 dark:via-teal-900 dark:to-cyan-900 flex items-center justify-center p-4">
-
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-500 via-blue-500 to-purple-600 dark:from-slate-950 dark:via-indigo-900 dark:to-purple-900 flex items-center justify-center p-4">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-16 -left-10 w-72 h-72 bg-white/20 dark:bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-cyan-400/30 dark:bg-cyan-500/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-400/30 dark:bg-indigo-500/20 rounded-full blur-3xl" />
       </div>
+      
       <div className="w-full max-w-md relative">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-teal-100/60 dark:border-slate-800 overflow-hidden">
-          <div className="bg-gradient-to-r from-teal-500 to-sky-500 dark:from-teal-400 dark:to-cyan-500 p-8 text-center">
-
-            <div className="w-14 h-14 bg-white/20 dark:bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold text-white">TM</span>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-slate-800">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 p-8 text-center">
+            <div className="w-16 h-16 bg-white/20 dark:bg-gray-900/20 rounded-xl backdrop-blur-sm flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl font-bold text-white">TM</span>
             </div>
             <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-            <p className="text-blue-100 dark:text-indigo-100 text-sm mt-1">Sign in to continue</p>
+            <p className="text-blue-100 dark:text-blue-300 mt-1 text-sm">Sign in to your account</p>
           </div>
 
+          {/* Feedback */}
           {feedback && (
             <div
               className={`mx-6 mt-6 rounded-lg border px-4 py-3 text-sm ${
                 feedback.type === 'success'
-                  ? 'border-green-200 bg-green-50 text-green-700'
-                  : 'border-red-200 bg-red-50 text-red-700'
+                  ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300'
+                  : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300'
               }`}
+              role="alert"
+              aria-live="polite"
             >
               {feedback.message}
             </div>
           )}
 
-          <form className="p-6 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-5">
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-800 dark:text-gray-200">Email</label>
-
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input
                 {...register('email', {
                   required: 'Email is required',
@@ -76,9 +102,10 @@ const Login = () => {
                 })}
                 type="email"
                 className={`w-full px-3 py-2 rounded-lg border ${
-                  errors.email ? 'border-red-500' : 'border-gray-200 dark:border-slate-700'
-                } focus:ring-2 focus:ring-teal-500/60 dark:focus:ring-cyan-400/60 focus:border-teal-500 dark:focus:border-cyan-400 transition-all bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100`}
+                  errors.email ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
                 placeholder="you@example.com"
+                autoComplete="email"
               />
               {errors.email && (
                 <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>
@@ -86,8 +113,15 @@ const Login = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-gray-800 dark:text-gray-200">Password</label>
-
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input
                   {...register('password', {
@@ -98,16 +132,17 @@ const Login = () => {
                     },
                   })}
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
                   className={`w-full px-3 py-2 pr-10 rounded-lg border ${
-                    errors.password ? 'border-red-500' : 'border-gray-200 dark:border-slate-700'
-                  } focus:ring-2 focus:ring-teal-500/60 dark:focus:ring-cyan-400/60 focus:border-teal-500 dark:focus:border-cyan-400 transition-all bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100`}
-                  placeholder="Enter your password"
+                    errors.password ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                  } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-200 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
                     <EyeSlashIcon className="h-5 w-5" />
@@ -123,26 +158,30 @@ const Login = () => {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                <input type="checkbox" className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:ring-offset-gray-800"
+                  {...register('remember')}
+                />
                 Remember me
               </label>
-              <a href="#" className="text-teal-500 dark:text-cyan-300 hover:underline">
-                Forgot password?
-              </a>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-teal-500 to-sky-500 dark:from-teal-400 dark:to-cyan-500 hover:from-teal-600 hover:to-sky-600 text-white py-2.5 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-70"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 hover:from-blue-700 hover:to-indigo-700 text-white py-2.5 px-4 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-70"
             >
-              {isLoading ? 'Signing in…' : 'Sign in'}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
 
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-              New here?{' '}
-              <Link to="/register" className="font-medium text-teal-500 dark:text-cyan-300 hover:underline">
-                Create an account
+              Don't have an account?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 dark:text-blue-300 hover:text-blue-500 hover:underline"
+              >
+                Sign up
               </Link>
             </p>
           </form>

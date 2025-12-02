@@ -2,14 +2,15 @@ import axios from 'axios';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'https://tenamed-backend.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true // Important for cookies if using httpOnly tokens
 });
 
-// Add request interceptor to include auth token
+// Request interceptor to include auth token in headers
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -23,14 +24,18 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle common errors
+// Response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem('token');
-      window.location.href = '/#/login';
+      localStorage.removeItem('user');
+      // Redirect to login if not already there
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -39,22 +44,88 @@ api.interceptors.response.use(
 // Auth API endpoints
 export const authAPI = {
   // Login user
-  login: async (credentials) => api.post('/auth/login', credentials),
+  login: async (credentials) => {
+    try {
+      const response = await api.post('/auth/login', credentials);
+      // Store token and user data
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+        }
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Login API error:', error);
+      throw error;
+    }
+  },
 
   // Register new user
-  register: async (userData) => api.post('/auth/register', userData),
+  register: async (userData) => {
+    try {
+      const response = await api.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  },
 
-  // Get user profile
-  getProfile: async () => api.get('/auth/me'),
-  
-  // Verify token by getting user profile
-  verifyToken: async () => api.get('/auth/me'),
+  // Get current user profile
+  getProfile: async () => {
+    try {
+      const response = await api.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      console.error('Get profile error:', error);
+      throw error;
+    }
+  },
 
   // Update user profile
-  updateProfile: async (profileData) => api.put('/auth/profile', profileData),
+  updateProfile: async (profileData) => {
+    try {
+      const response = await api.put('/auth/profile', profileData);
+      // Update local storage if needed
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      throw error;
+    }
+  },
 
   // Logout user
-  logout: async () => api.post('/auth/logout'),
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear auth data from local storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  },
+
+  // Check if user is authenticated
+  isAuthenticated: () => {
+    return !!localStorage.getItem('token');
+  },
+
+  // Get current user
+  getCurrentUser: () => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  },
+
+  // Get auth token
+  getToken: () => {
+    return localStorage.getItem('token');
+  }
 };
 
 export default api;
