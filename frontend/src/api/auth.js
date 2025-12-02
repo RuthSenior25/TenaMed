@@ -1,13 +1,17 @@
+// frontend/src/api/auth.js
 import axios from 'axios';
+
+// Get the base URL from environment variables
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api',
+  baseURL: API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL, // Remove trailing slash if exists
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Important for cookies if using httpOnly tokens
+  withCredentials: true
 });
 
 // Request interceptor to include auth token in headers
@@ -24,46 +28,34 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle common errors
+// Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
+      // Handle unauthorized access
       localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-// Auth API endpoints
-export const authAPI = {
-  // Login user
+// Auth API methods
+const authAPI = {
   login: async (credentials) => {
     try {
       const response = await api.post('/auth/login', credentials);
-      // Store token and user data
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-        }
-      }
       return response.data;
     } catch (error) {
-      console.error('Login API error:', error);
+      console.error('Login error:', error);
       throw error;
     }
   },
 
-  // Register new user
   register: async (userData) => {
     try {
+      console.log('Sending registration request to:', `${api.defaults.baseURL}/auth/register`);
       const response = await api.post('/auth/register', userData);
       return response.data;
     } catch (error) {
@@ -72,74 +64,48 @@ export const authAPI = {
     }
   },
 
-  // Get current user profile
+  // Add other auth methods as needed
   getProfile: async () => {
-    try {
-      const response = await api.get('/auth/me');
-      return response.data;
-    } catch (error) {
-      console.error('Get profile error:', error);
-      throw error;
-    }
+    const response = await api.get('/auth/me');
+    return response.data;
   },
 
-  // Verify token
-  verifyToken: async () => {
+  // Add verifyToken method
+  verifyToken: async (token) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return { valid: false };
-      
-      const response = await api.get('/auth/verify-token');
-      return { valid: true, user: response.data.user };
+      const response = await api.post('/auth/verify-token', { token });
+      return response.data;
     } catch (error) {
       console.error('Token verification error:', error);
-      return { valid: false };
-    }
-  },
-
-  // Update user profile
-  updateProfile: async (profileData) => {
-    try {
-      const response = await api.put('/auth/profile', profileData);
-      // Update local storage if needed
-      if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-      }
-      return response.data;
-    } catch (error) {
-      console.error('Update profile error:', error);
       throw error;
     }
   },
 
-  // Logout user
-  logout: async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear auth data from local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
+  updateProfile: async (profileData) => {
+    const response = await api.put('/auth/profile', profileData);
+    return response.data;
   },
 
-  // Check if user is authenticated
+  logout: async () => {
+    const response = await api.post('/auth/logout');
+    return response.data;
+  },
+
+  // Add this method to check if user is authenticated
   isAuthenticated: () => {
     return !!localStorage.getItem('token');
   },
 
-  // Get current user
+  // Add this method to get current user from localStorage
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
 
-  // Get auth token
+  // Add this method to get token
   getToken: () => {
     return localStorage.getItem('token');
   }
 };
 
-export default api;
+export default authAPI;
