@@ -418,16 +418,20 @@ const Register = () => {
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
 
-            {/* Login Link */}
-            <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
-              Already have an account?{' '}
-              <Link
-                to="/login"
-                className="font-medium text-blue-600 dark:text-blue-300 hover:text-blue-500 hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
+          {/* Login Link */}
+<p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+  Already have an account?{' '}
+  <Link
+    to="/login"
+    onClick={(e) => {
+      e.preventDefault();
+      navigate('/login');
+    }}
+    className="font-medium text-blue-600 dark:text-blue-300 hover:text-blue-500 hover:underline"
+  >
+    Sign in
+  </Link>
+</p>
           </form>
         </div>
       </div>
