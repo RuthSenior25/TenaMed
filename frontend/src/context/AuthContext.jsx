@@ -1,0 +1,376 @@
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { authAPI } from '../api/auth';
+import toast from 'react-hot-toast';
+
+// Hardcoded credentials
+const ADMIN_CREDENTIALS = {
+  email: 'admin@tenamed.com',
+  password: 'Admin@TenaMed2024!',
+  role: 'admin',
+  firstName: 'Admin',
+  lastName: 'User',
+  id: 'admin-001'
+};
+
+// Hardcoded government credentials
+const GOVERNMENT_CREDENTIALS = {
+  email: 'Government@gmail.com',
+  password: 'TenaMed1',
+  role: 'government',
+  firstName: 'Government',
+  lastName: 'Official',
+  id: 'gov-001'
+};
+
+const AuthContext = createContext();
+
+const initialState = {
+  user: null,
+  token: localStorage.getItem('token'),
+  isAuthenticated: false,
+  isLoading: true,
+};
+
+const authReducer = (state, action) => {
+  switch (action.type) {
+    case 'LOGIN_START':
+      return { ...state, isLoading: true };
+    case 'LOGIN_SUCCESS':
+      return {
+        ...state,
+        user: action.payload.user,
+        token: action.payload.token,
+        isAuthenticated: true,
+        isLoading: false,
+      };
+    case 'LOGIN_FAILURE':
+      return {
+        ...state,
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+      };
+    case 'LOGOUT':
+      return {
+        ...state,
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+      };
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'UPDATE_USER':
+      return { ...state, user: { ...state.user, ...action.payload } };
+    default:
+      return state;
+  }
+};
+
+export const AuthProvider = ({ children }) => {
+  const [state, dispatch] = useReducer(authReducer, initialState);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        if (isMounted) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+        return;
+      }
+
+      try {
+        // First verify the token is still valid
+        const response = await authAPI.verifyToken();
+        
+        if (isMounted) {
+          // Then get the full user profile
+          const profileResponse = await authAPI.getProfile();
+          
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { 
+              user: profileResponse.data, 
+              token 
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        if (isMounted) {
+          // Only clear token if it's invalid
+          if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+          }
+          dispatch({ type: 'LOGOUT' });
+        }
+      } finally {
+        if (isMounted) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      }
+    };
+
+    checkAuth();
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const login = async (credentials) => {
+    try {
+      dispatch({ type: 'LOGIN_START' });
+      
+      // Check for admin login
+      if (credentials.email === ADMIN_CREDENTIALS.email && 
+          credentials.password === ADMIN_CREDENTIALS.password) {
+        
+        const adminUser = {
+          _id: ADMIN_CREDENTIALS.id,
+          email: ADMIN_CREDENTIALS.email,
+          role: ADMIN_CREDENTIALS.role,
+          firstName: ADMIN_CREDENTIALS.firstName,
+          lastName: ADMIN_CREDENTIALS.lastName,
+          isAdmin: true
+        };
+        
+        // Generate a simple token for admin
+        const adminToken = `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        localStorage.setItem('token', adminToken);
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: { user: adminUser, token: adminToken },
+        });
+        
+        toast.success(`Welcome back, Administrator!`);
+        return { success: true };
+      }
+      
+      // Check for government login
+      if (credentials.email === GOVERNMENT_CREDENTIALS.email && 
+          credentials.password === GOVERNMENT_CREDENTIALS.password) {
+        
+        const governmentUser = {
+          _id: GOVERNMENT_CREDENTIALS.id,
+          email: GOVERNMENT_CREDENTIALS.email,
+          role: GOVERNMENT_CREDENTIALS.role,
+          firstName: GOVERNMENT_CREDENTIALS.firstName,
+          lastName: GOVERNMENT_CREDENTIALS.lastName
+        };
+        
+        // Generate a simple token for government user
+        const govToken = `gov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        localStorage.setItem('token', govToken);
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: { user: governmentUser, token: govToken },
+        });
+        
+        toast.success(`Welcome, ${GOVERNMENT_CREDENTIALS.firstName} ${GOVERNMENT_CREDENTIALS.lastName}!`);
+        return { success: true };
+      }
+      
+      // Regular user login
+      const response = await authAPI.login(credentials);
+      
+      if (!response.data || !response.data.token) {
+        throw new Error('Invalid response from server');
+      }
+      
+      const { user, token } = response.data;
+
+      // Store the token in local storage
+      localStorage.setItem('token', token);
+      
+      // Update the axios instance with the new token
+      if (authAPI && authAPI.defaults && authAPI.defaults.headers) {
+        authAPI.defaults.headers.common = authAPI.defaults.headers.common || {};
+        authAPI.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Get the full user profile
+      const profileResponse = await authAPI.getProfile();
+      const userWithProfile = { ...user, ...(profileResponse?.data || {}) };
+
+      // Update the auth state
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: { 
+          user: userWithProfile, 
+          token 
+        },
+      });
+
+      // Customize welcome message based on user role
+      const roleMessages = {
+        government: 'Government Official',
+        pharmacy: 'Pharmacy Owner',
+        dispatcher: 'Delivery Person',
+        supplier: 'Medicine Supplier',
+        patient: 'Patient'
+      };
+      
+      const roleMessage = roleMessages[user.role] || '';
+      toast.success(`Welcome back, ${user.firstName || 'User'}! ${roleMessage ? `(${roleMessage})` : ''}`);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      // Clear any invalid token
+      localStorage.removeItem('token');
+      if (authAPI && authAPI.defaults && authAPI.defaults.headers && authAPI.defaults.headers.common) {
+        delete authAPI.defaults.headers.common['Authorization'];
+      }
+      
+      // Prepare error message
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+      
+      if (error.response) {
+        // Server responded with an error status code
+        const errors = error.response.data?.errors;
+        const detailed = Array.isArray(errors) && errors.length ? errors[0].msg : null;
+        errorMessage = detailed || error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      toast.error(errorMessage);
+      dispatch({ type: 'LOGIN_FAILURE' });
+      return { 
+        success: false, 
+        message: errorMessage,
+        error: error.response?.data || error.message
+      };
+    }
+  };
+
+  const register = async (userData) => {
+    try {
+      dispatch({ type: 'LOGIN_START' });
+      
+      // Prepare registration data
+      const registrationData = { 
+        ...userData,
+        // Add any additional fields needed for registration
+      };
+      
+      // If registering as a pharmacy, add pending status
+      if (userData.role === 'pharmacy') {
+        registrationData.status = 'pending_approval';
+      }
+      
+      // Make the registration API call
+      const response = await authAPI.register(registrationData);
+      
+      if (!response.data || !response.data.token) {
+        throw new Error('Invalid response from server');
+      }
+      
+      const { user, token } = response.data;
+
+      // Store the token in local storage
+      localStorage.setItem('token', token);
+      
+      // Update the axios instance with the new token
+      if (authAPI && authAPI.defaults && authAPI.defaults.headers) {
+        authAPI.defaults.headers.common = authAPI.defaults.headers.common || {};
+        authAPI.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Get the full user profile
+      const profileResponse = await authAPI.getProfile();
+      const userWithProfile = { ...user, ...(profileResponse?.data || {}) };
+
+      // Update the auth state
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: { 
+          user: { 
+            ...userWithProfile, 
+            status: registrationData.status 
+          }, 
+          token 
+        },
+      });
+
+      // Show success message based on user role
+      if (user.role === 'pharmacy') {
+        toast.success('Registration successful! Your account is pending admin approval.');
+      } else {
+        toast.success(`Welcome to TenaMed, ${user.firstName || 'User'}!`);
+      }
+      
+      return { 
+        success: true,
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      // Clear any invalid token
+      localStorage.removeItem('token');
+      if (authAPI?.defaults?.headers?.common) {
+        delete authAPI.defaults.headers.common['Authorization'];
+      }
+      
+      // Prepare error message
+      let errorMessage = 'Registration failed. Please check your information and try again.';
+      
+      if (error.response) {
+        // Server responded with an error status code
+        const errors = error.response.data?.errors;
+        const detailed = Array.isArray(errors) && errors.length ? errors[0].msg : null;
+        errorMessage = detailed || error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      toast.error(errorMessage);
+      dispatch({ type: 'LOGIN_FAILURE' });
+      
+      return { 
+        success: false, 
+        message: errorMessage,
+        error: error.response?.data || error.message
+      };
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    dispatch({ type: 'LOGOUT' });
+    toast.success('Logged out successfully');
+  };
+
+  const updateUser = (userData) => {
+    dispatch({ type: 'UPDATE_USER', payload: userData });
+  };
+
+  const value = {
+    ...state,
+    login,
+    register,
+    logout,
+    updateUser,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

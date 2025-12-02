@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Simple CSS for TenaMed */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  min-height: 100vh;
+}
+
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.max-w-md {
+  max-width: 448px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.p-4 {
+  padding: 16px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mb-8 {
+  margin-bottom: 32px;
+}
+
+.h-16 {
+  height: 64px;
+}
+
+.w-16 {
+  width: 64px;
+}
+
+.bg-primary-600 {
+  background: #2563eb;
+}
+
+.rounded-xl {
+  border-radius: 12px;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.mb-6 {
+  margin-bottom: 24px;
+}
+
+.h-10 {
+  height: 40px;
+}
+
+.w-10 {
+  width: 40px;
+}
+
+.text-white {
+  color: white;
+}
+
+.text-4xl {
+  font-size: 36px;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.text-secondary-900 {
+  color: #0f172a;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
+}
+
+.text-lg {
+  font-size: 18px;
+}
+
+.text-secondary-600 {
+  color: #475569;
+}
+
+.bg-white {
+  background: white;
+}
+
+.rounded-2xl {
+  border-radius: 16px;
+}
+
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.p-8 {
+  padding: 32px;
+}
+
+.text-2xl {
+  font-size: 24px;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-secondary-800 {
+  color: #1e293b;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  transition: all 0.2s;
+  font-size: 16px;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.text-secondary-500 {
+  color: #64748b;
+}
+
+.mt-6 {
+  margin-top: 24px;
+}
+
+.sidebar-nav {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-nav-item {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-nav-item-active {
+  background: #3b82f6;
+  color: white;
+}
+
+.sidebar-nav-item-inactive {
+  color: #333;
+}
+
+.sidebar-nav-item-inactive:hover {
+  background: #f1f5f9;
+  color: #475569;
+}

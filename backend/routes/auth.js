@@ -1,0 +1,196 @@
+const express = require('express');
+const router = express.Router();
+const User = require('../models/User');
+const Pharmacy = require('../models/Pharmacy');
+const { generateToken } = require('../middleware/auth');
+const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
+
+// Register new user
+router.post('/register', validateUserRegistration, async (req, res) => {
+  try {
+    const { username, email, password, role, profile } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: 'User already exists with this email or username'
+      });
+    }
+
+    // Create new user
+    const user = new User({
+      username,
+      email,
+      password,
+      role,
+      profile,
+      isApproved: role === 'patient' || role === 'admin' // Auto-approve patients and admins
+    });
+
+    await user.save();
+
+    // Generate token
+    const token = generateToken({ id: user._id, role: user.role });
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+        isApproved: user.isApproved,
+        isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+// Login user
+router.post('/login', validateUserLogin, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ message: 'Account has been deactivated' });
+    }
+
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Generate token
+    const token = generateToken({ id: user._id, role: user.role });
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+        isApproved: user.isApproved,
+        isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login' });
+  }
+});
+
+// Get current user profile
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const token = authHeader.substring(7);
+    const { verifyToken } = require('../middleware/auth');
+    const decoded = verifyToken(token);
+
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'Invalid token or user not found.' });
+    }
+
+    // If user is a pharmacy, also fetch pharmacy details
+    let pharmacy = null;
+    if (user.role === 'pharmacy') {
+      pharmacy = await Pharmacy.findOne({ owner: user._id });
+    }
+
+    res.json({
+      user,
+      pharmacy
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(401).json({ message: 'Invalid token' });
+  }
+});
+
+// Refresh token
+router.post('/refresh', async (req, res) => {
+  try {
+    const authHeader = req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const token = authHeader.substring(7);
+    const { verifyToken } = require('../middleware/auth');
+    const decoded = verifyToken(token);
+
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'Invalid token or user not found.' });
+    }
+
+    // Generate new token
+    const newToken = generateToken({ id: user._id, role: user.role });
+
+    res.json({
+      message: 'Token refreshed successfully',
+      token: newToken
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(401).json({ message: 'Invalid token' });
+  }
+});
+
+// Logout (client-side token removal, but we can update last activity)
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.header('Authorization');
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const { verifyToken } = require('../middleware/auth');
+      const decoded = verifyToken(token);
+
+      // Update user's last activity
+      await User.findByIdAndUpdate(decoded.id, { lastLogin: new Date() });
+    }
+
+    res.json({ message: 'Logout successful' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.json({ message: 'Logout successful' }); // Still return success for client-side cleanup
+  }
+});
+
+module.exports = router;
