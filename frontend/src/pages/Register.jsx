@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
@@ -39,52 +39,39 @@ const Register = () => {
       return;
     }
     
-    // Prepare registration data
+    // Prepare registration data according to backend expectations
     const registrationData = {
-      ...data,
-      firstName: data.firstName?.trim() || '',
-      lastName: data.lastName?.trim() || '',
-      email: data.email?.trim() || '',
-      phone: data.phone?.trim() || '',
-      username: data.username?.trim() || '',
-      location: data.role === 'pharmacy' ? {
+      username: data.username?.trim() || data.email.split('@')[0],
+      email: data.email?.trim().toLowerCase(),
+      password: data.password,
+      role: data.role,
+      profile: {
+        firstName: data.firstName?.trim(),
+        lastName: data.lastName?.trim(),
+        phone: data.phone?.trim() || undefined,
+        address: data.address?.trim() || undefined
+      }
+    };
+
+    // Add location if role is pharmacy
+    if (data.role === 'pharmacy' && pharmacyLocation) {
+      registrationData.location = {
         type: 'Point',
         coordinates: [pharmacyLocation.lng, pharmacyLocation.lat]
-      } : null
-    };
-    
+      };
+    }
+
     // Validate required fields
-    if (!registrationData.firstName) {
+    if (!registrationData.profile.firstName) {
       setError('firstName', { type: 'required', message: 'First name is required' });
       toast.error('First name is required');
       setIsLoading(false);
       return;
     }
     
-    if (!registrationData.lastName) {
+    if (!registrationData.profile.lastName) {
       setError('lastName', { type: 'required', message: 'Last name is required' });
       toast.error('Last name is required');
-      setIsLoading(false);
-      return;
-    }
-    
-    if (!registrationData.email) {
-      setError('email', { type: 'required', message: 'Email is required' });
-      toast.error('Email is required');
-      setIsLoading(false);
-      return;
-    }
-    
-    if (!registrationData.password) {
-      setError('password', { type: 'required', message: 'Password is required' });
-      toast.error('Password is required');
-      setIsLoading(false);
-      return;
-    }
-    
-    if (!registrationData.role) {
-      setError('role', { type: 'required', message: 'Please select a role' });
-      toast.error('Please select a role');
       setIsLoading(false);
       return;
     }
@@ -98,20 +85,22 @@ const Register = () => {
         toast.success(successMessage, { duration: 5000 });
         setFeedback({ type: 'success', message: 'Account created successfully! Redirecting…' });
         setTimeout(() => navigate('/dashboard'), 1500);
-      } else if (!result.success) {
-        if (result.message?.includes('User already exists')) {
-          const errorMessage = 'An account already exists with this email. Please try logging in or use a different email.';
+      } else {
+        if (result.message?.includes('already exists')) {
+          const errorMessage = 'An account already exists with this email or username.';
           setError('email', {
             type: 'server',
             message: 'An account already exists with this email.',
           });
           setError('username', {
             type: 'server',
-            message: 'Please choose a different username.',
+            message: 'Username is already taken.',
           });
           toast.error(errorMessage, { duration: 5000 });
         } else {
-          toast.error(result.message || 'Registration failed. Please check your details and try again.', { duration: 5000 });
+          toast.error(result.message || 'Registration failed. Please check your details and try again.', { 
+            duration: 5000 
+          });
         }
         setFeedback({ type: 'error', message: result.message || 'Registration failed' });
       }
@@ -127,14 +116,12 @@ const Register = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-indigo-500 via-blue-500 to-purple-600 dark:from-slate-950 dark:via-indigo-900 dark:to-purple-900 flex items-center justify-center p-4">
-
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-16 -left-10 w-72 h-72 bg-white/20 dark:bg-white/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-400/30 dark:bg-indigo-500/20 rounded-full blur-3xl" />
       </div>
       <div className="w-full max-w-md relative">
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg overflow-hidden border border-gray-100 dark:border-slate-800">
-
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 dark:bg-gradient-to-r dark:from-blue-500 dark:to-indigo-500 p-8 text-center">
             <div className="w-16 h-16 bg-white/20 dark:bg-gray-900/20 rounded-xl backdrop-blur-sm flex items-center justify-center mx-auto mb-4">
@@ -144,7 +131,7 @@ const Register = () => {
             <p className="text-blue-100 dark:text-blue-300 mt-1 text-sm">Join TenaMed today</p>
           </div>
 
-          {/* Feedback - Kept for accessibility and as a fallback */}
+          {/* Feedback */}
           {feedback && (
             <div
               className={`mx-6 mt-6 rounded-lg border px-4 py-3 text-sm ${
@@ -270,10 +257,6 @@ const Register = () => {
                       value: 6,
                       message: 'Password must be at least 6 characters',
                     },
-                    pattern: {
-                      value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/,
-                      message: 'Include upper, lower case letters and a number',
-                    },
                   })}
                   type={showPassword ? 'text' : 'password'}
                   className={`w-full px-3 py-2 pr-10 rounded-lg border ${
@@ -351,18 +334,10 @@ const Register = () => {
                 <option value="patient">Patient - Order and manage prescriptions</option>
                 <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
                 <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
-                <option value="supplier">Medicine Supplier - Supply medications to pharmacies</option>
-                <option value="government">Government Official - Regulatory oversight and monitoring</option>
               </select>
               {errors.role && (
                 <p className="text-red-500 text-xs mt-1">{errors.role.message}</p>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Select the role that best describes how you'll use TenaMed.
-              </p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                <span className="font-medium">Note:</span> Government officials may require additional verification.
-              </p>
 
               {/* Pharmacy Location Picker */}
               {showLocationPicker && (
@@ -394,13 +369,6 @@ const Register = () => {
             >
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
-
-            {/* Terms and Privacy */}
-            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-4">
-              By creating an account, you agree to our{' '}
-              <a href="#" className="text-blue-600 dark:text-blue-300 hover:underline">Terms</a> and{' '}
-              <a href="#" className="text-blue-600 dark:text-blue-300 hover:underline">Privacy Policy</a>
-            </p>
 
             {/* Login Link */}
             <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
