@@ -334,32 +334,40 @@ const Register = () => {
                 <option value="patient">Patient - Order and manage prescriptions</option>
                 <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
                 <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
+                <option value="admin">Administrator - System management</option>
+                <option value="government">Government Official - Regulatory oversight and monitoring</option>
               </select>
               {errors.role && (
                 <p className="text-red-500 text-xs mt-1">{errors.role.message}</p>
               )}
-
-              {/* Pharmacy Location Picker */}
-              {showLocationPicker && (
-                <div className="mt-4 p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                    Pharmacy Location
-                  </h3>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                    Please select your pharmacy's location on the map. This will help patients find you.
-                  </p>
-                  <PharmacyLocationPicker 
-                    onLocationSelect={(location) => setPharmacyLocation(location)} 
-                    initialPosition={pharmacyLocation}
-                  />
-                  {pharmacyLocation && (
-                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                      Location selected: {pharmacyLocation.lat.toFixed(6)}, {pharmacyLocation.lng.toFixed(6)}
-                    </div>
-                  )}
-                </div>
-              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Select the role that best describes how you'll use TenaMed.
+              </p>
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                <span className="font-medium">Note:</span> Government and Admin roles require additional verification.
+              </p>
             </div>
+
+            {/* Pharmacy Location Picker */}
+            {showLocationPicker && (
+              <div className="mt-4 p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Pharmacy Location
+                </h3>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                  Please select your pharmacy's location on the map. This will help patients find you.
+                </p>
+                <PharmacyLocationPicker 
+                  onLocationSelect={(location) => setPharmacyLocation(location)} 
+                  initialPosition={pharmacyLocation}
+                />
+                {pharmacyLocation && (
+                  <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                    Location selected: {pharmacyLocation.lat.toFixed(6)}, {pharmacyLocation.lng.toFixed(6)}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Submit Button */}
             <button
