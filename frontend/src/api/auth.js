@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Important for cookies if using httpOnly tokens
+  withCredentials: process.env.NODE_ENV !== 'test' // Only include credentials in non-test environments
 });
 
 // Request interceptor to include auth token in headers
