@@ -328,31 +328,31 @@ const Register = () => {
                 <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>
               )}
             </div>
-
-            {/* Role Selection */}
-            <div className="space-y-1">
+ {/* Role Selection */}
+            <div
+            className="space-y-1">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">I am a</label>
               <select
-                {...register('role', { 
-                  required: 'Please select your role',
-                  onChange: (e) => {
-                    setSelectedRole(e.target.value);
-                    setShowLocationPicker(e.target.value === 'pharmacy');
-                  }
-                })}
-                className={`w-full px-3 py-2 rounded-lg border ${
-                  errors.role ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
-                } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all bg-white dark:bg-gray-900 dark:text-gray-100`}
-                aria-label="Select your role"
-                value={selectedRole}
-              >
-                <option value="">Select your role</option>
-                <option value="patient">Patient - Order and manage prescriptions</option>
-                <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
-                <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
-                <option value="admin">Administrator - System management</option>
-                <option value="government">Government Official - Regulatory oversight and monitoring</option>
-              </select>
+  {...register('role', { 
+    required: 'Please select your role',
+    onChange: (e) => {
+      setSelectedRole(e.target.value);
+      setShowLocationPicker(e.target.value === 'pharmacy');
+    }
+  })}
+  className={`w-full px-3 py-2 rounded-lg border ${
+    errors.role ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+  } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all bg-white dark:bg-gray-900 dark:text-gray-100`}
+  aria-label="Select your role"
+  value={selectedRole}
+>
+  <option value="">Select your role</option>
+  <option value="patient">Patient - Order and manage prescriptions</option>
+  <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
+  <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
+  <option value="admin">Administrator - System management</option>
+  <option value="government">Government Official - Regulatory oversight and monitoring</option>
+</select>
               {errors.role && (
                 <p className="text-red-500 text-xs mt-1">{errors.role.message}</p>
               )}
