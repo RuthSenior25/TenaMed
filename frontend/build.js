@@ -1,5 +1,5 @@
-const { build } = require('vite');
-const { resolve } = require('path');
+import { build } from 'vite';
+import { resolve } from 'path';
 
 async function runBuild() {
   try {
