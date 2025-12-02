@@ -1,12 +1,12 @@
 {
     "version": "0.1.0",
     "name": "tenamed-frontend",
-    "scripts": {
-        "dev": "vite",
-        "build": "npx vite build",
-        "preview": "vite preview",
-        "vercel-build": "npm install && npx vite build"
-    },
+ "scripts": {
+  "dev": "vite",
+  "build": "node build.js",
+  "preview": "vite preview",
+  "vercel-build": "npm install && node build.js"
+},
     "type": "module",
     "dependencies": {
         "@heroicons/react": "^2.2.0",
