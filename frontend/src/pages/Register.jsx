@@ -16,6 +16,7 @@ const Register = () => {
   const [pharmacyLocation, setPharmacyLocation] = useState(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedRole, setSelectedRole] = useState('');
+  const [pharmacyName, setPharmacyName] = useState('');
 
   const {
     register,
@@ -32,14 +33,25 @@ const Register = () => {
     setFeedback(null);
     setIsLoading(true);
     
-    // Validate pharmacy location if role is pharmacy
-    if (data.role === 'pharmacy' && !pharmacyLocation) {
-      toast.error('Please select your pharmacy location on the map');
-      setIsLoading(false);
-      return;
+    // Validate pharmacy-specific fields if role is pharmacy
+    if (data.role === 'pharmacy') {
+      if (!pharmacyLocation) {
+        toast.error('Please select your pharmacy location on the map');
+        setIsLoading(false);
+        return;
+      }
+      if (!pharmacyName?.trim()) {
+        setError('pharmacyName', { 
+          type: 'required', 
+          message: 'Pharmacy name is required' 
+        });
+        toast.error('Pharmacy name is required');
+        setIsLoading(false);
+        return;
+      }
     }
     
-    // Prepare registration data according to backend expectations
+    // Prepare registration data
     const registrationData = {
       username: data.username?.trim() || data.email.split('@')[0],
       email: data.email?.trim().toLowerCase(),
@@ -53,8 +65,9 @@ const Register = () => {
       }
     };
 
-    // Add location if role is pharmacy
-    if (data.role === 'pharmacy' && pharmacyLocation) {
+    // Add pharmacy-specific data
+    if (data.role === 'pharmacy') {
+      registrationData.pharmacyName = pharmacyName.trim();
       registrationData.location = {
         type: 'Point',
         coordinates: [pharmacyLocation.lng, pharmacyLocation.lat]
@@ -81,9 +94,12 @@ const Register = () => {
       console.log('Register result:', result);
       
       if (result.success) {
-        const successMessage = `Welcome to TenaMed, ${data.firstName}! Your ${data.role} account has been created successfully.`;
+        const successMessage = data.role === 'pharmacy' 
+          ? `Welcome to TenaMed, ${data.firstName}! Your pharmacy "${pharmacyName}" has been registered successfully.` 
+          : `Welcome to TenaMed, ${data.firstName}! Your ${data.role} account has been created successfully.`;
+        
         toast.success(successMessage, { duration: 5000 });
-        setFeedback({ type: 'success', message: 'Account created successfully! Redirecting…' });
+        setFeedback({ type: 'success', message: 'Account created successfully! Redirecting...' });
         setTimeout(() => navigate('/dashboard'), 1500);
       } else {
         if (result.message?.includes('already exists')) {
@@ -347,6 +363,30 @@ const Register = () => {
                 <span className="font-medium">Note:</span> Government and Admin roles require additional verification.
               </p>
             </div>
+
+            {/* Pharmacy Name - Only show for pharmacy role */}
+            {selectedRole === 'pharmacy' && (
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Pharmacy Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  {...register('pharmacyName', {
+                    required: selectedRole === 'pharmacy' ? 'Pharmacy name is required' : false,
+                  })}
+                  type="text"
+                  value={pharmacyName}
+                  onChange={(e) => setPharmacyName(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg border ${
+                    errors.pharmacyName ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                  } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                  placeholder="Enter pharmacy name"
+                />
+                {errors.pharmacyName && (
+                  <p className="text-red-500 text-xs mt-1">{errors.pharmacyName.message}</p>
+                )}
+              </div>
+            )}
 
             {/* Pharmacy Location Picker */}
             {showLocationPicker && (
