@@ -83,6 +83,20 @@ export const authAPI = {
     }
   },
 
+  // Verify token
+  verifyToken: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return { valid: false };
+      
+      const response = await api.get('/auth/verify-token');
+      return { valid: true, user: response.data.user };
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return { valid: false };
+    }
+  },
+
   // Update user profile
   updateProfile: async (profileData) => {
     try {
