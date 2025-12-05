@@ -133,6 +133,19 @@ export const authAPI = {
         throw new Error('Registration with this role is not allowed');
       }
       
+      // Format pharmacy data if role is pharmacy
+      if (userData.role === 'pharmacy' && userData.location) {
+        const registrationData = {
+          ...userData,
+          location: {
+            type: 'Point',
+            coordinates: [userData.location.lng, userData.location.lat]
+          }
+        };
+        const response = await api.post('/auth/register', registrationData);
+        return { success: true, data: response.data };
+      }
+      
       const response = await api.post('/auth/register', userData);
       return { success: true, data: response.data };
     } catch (error) {
