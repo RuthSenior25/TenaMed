@@ -1,3 +1,4 @@
+// frontend/src/pages/Register.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -51,78 +52,60 @@ const Register = () => {
       }
     }
     
-    // Prepare registration data
-    const registrationData = {
-      username: data.username?.trim() || data.email.split('@')[0],
-      email: data.email?.trim().toLowerCase(),
-      password: data.password,
-      role: data.role,
-      profile: {
-        firstName: data.firstName?.trim(),
-        lastName: data.lastName?.trim(),
-        phone: data.phone?.trim() || undefined,
-        address: data.address?.trim() || undefined
-      }
-    };
-
-    // Add pharmacy-specific data
-    if (data.role === 'pharmacy') {
-      registrationData.pharmacyName = pharmacyName.trim();
-      registrationData.location = {
-        type: 'Point',
-        coordinates: [pharmacyLocation.lng, pharmacyLocation.lat]
-      };
-    }
-
-    // Validate required fields
-    if (!registrationData.profile.firstName) {
-      setError('firstName', { type: 'required', message: 'First name is required' });
-      toast.error('First name is required');
-      setIsLoading(false);
-      return;
-    }
-    
-    if (!registrationData.profile.lastName) {
-      setError('lastName', { type: 'required', message: 'Last name is required' });
-      toast.error('Last name is required');
-      setIsLoading(false);
-      return;
-    }
-    
     try {
+      // Prepare registration data
+      const registrationData = {
+        username: data.username?.trim() || data.email.split('@')[0],
+        email: data.email?.trim().toLowerCase(),
+        password: data.password,
+        role: data.role,
+        profile: {
+          firstName: data.firstName?.trim(),
+          lastName: data.lastName?.trim(),
+          phone: data.phone?.trim() || '',
+          address: data.address?.trim() || '',
+          city: data.city?.trim() || '',
+          state: data.state?.trim() || '',
+          zipCode: data.zipCode?.trim() || ''
+        }
+      };
+
+      // Add pharmacy-specific data
+      if (data.role === 'pharmacy') {
+        registrationData.pharmacyName = pharmacyName.trim();
+        registrationData.location = {
+          lat: pharmacyLocation.lat,
+          lng: pharmacyLocation.lng
+        };
+      }
+
       const result = await registerUser(registrationData);
       console.log('Register result:', result);
       
       if (result.success) {
         const successMessage = data.role === 'pharmacy' 
-          ? `Welcome to TenaMed, ${data.firstName}! Your pharmacy "${pharmacyName}" has been registered successfully.` 
+          ? `Welcome to TenaMed, ${data.firstName}! Your pharmacy "${pharmacyName}" has been registered successfully and is pending approval.` 
           : `Welcome to TenaMed, ${data.firstName}! Your ${data.role} account has been created successfully.`;
         
         toast.success(successMessage, { duration: 5000 });
         setFeedback({ type: 'success', message: 'Account created successfully! Redirecting...' });
         setTimeout(() => navigate('/dashboard'), 1500);
-      } else {
-        if (result.message?.includes('already exists')) {
-          const errorMessage = 'An account already exists with this email or username.';
-          setError('email', {
-            type: 'server',
-            message: 'An account already exists with this email.',
-          });
-          setError('username', {
-            type: 'server',
-            message: 'Username is already taken.',
-          });
-          toast.error(errorMessage, { duration: 5000 });
-        } else {
-          toast.error(result.message || 'Registration failed. Please check your details and try again.', { 
-            duration: 5000 
-          });
-        }
-        setFeedback({ type: 'error', message: result.message || 'Registration failed' });
       }
     } catch (error) {
       console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || 'Something went wrong. Please try again later.';
+      const errorMessage = error.response?.data?.message || error.message || 'Something went wrong. Please try again later.';
+      
+      if (errorMessage.includes('already exists')) {
+        setError('email', {
+          type: 'server',
+          message: 'An account with this email already exists.',
+        });
+        setError('username', {
+          type: 'server',
+          message: 'This username is already taken.',
+        });
+      }
+      
       toast.error(errorMessage, { duration: 5000 });
       setFeedback({ type: 'error', message: errorMessage });
     } finally {
@@ -359,49 +342,127 @@ const Register = () => {
               </p>
             </div>
 
-            {/* Pharmacy Name - Only show for pharmacy role */}
+            {/* Pharmacy-specific fields */}
             {selectedRole === 'pharmacy' && (
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Pharmacy Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  {...register('pharmacyName', {
-                    required: selectedRole === 'pharmacy' ? 'Pharmacy name is required' : false,
-                  })}
-                  type="text"
-                  value={pharmacyName}
-                  onChange={(e) => setPharmacyName(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border ${
-                    errors.pharmacyName ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
-                  } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
-                  placeholder="Enter pharmacy name"
-                />
-                {errors.pharmacyName && (
-                  <p className="text-red-500 text-xs mt-1">{errors.pharmacyName.message}</p>
-                )}
-              </div>
-            )}
+              <>
+                {/* Pharmacy Name */}
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Pharmacy Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={pharmacyName}
+                    onChange={(e) => setPharmacyName(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      !pharmacyName ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                    } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                    placeholder="Enter pharmacy name"
+                  />
+                  {!pharmacyName && (
+                    <p className="text-red-500 text-xs mt-1">Pharmacy name is required</p>
+                  )}
+                </div>
 
-            {/* Pharmacy Location Picker */}
-            {showLocationPicker && (
-              <div className="mt-4 p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                  Pharmacy Location
-                </h3>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                  Please select your pharmacy's location on the map. This will help patients find you.
-                </p>
-                <PharmacyLocationPicker 
-                  onLocationSelect={(location) => setPharmacyLocation(location)} 
-                  initialPosition={pharmacyLocation}
-                />
-                {pharmacyLocation && (
-                  <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                    Location selected: {pharmacyLocation.lat.toFixed(6)}, {pharmacyLocation.lng.toFixed(6)}
+                {/* Pharmacy Location Picker */}
+                <div className="mt-4 p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    Pharmacy Location
+                  </h3>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                    Please select your pharmacy's location on the map. This will help patients find you.
+                  </p>
+                  <PharmacyLocationPicker 
+                    onLocationSelect={(location) => setPharmacyLocation(location)} 
+                    initialPosition={pharmacyLocation}
+                  />
+                  {pharmacyLocation ? (
+                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                      Location selected: {pharmacyLocation.lat.toFixed(6)}, {pharmacyLocation.lng.toFixed(6)}
+                    </div>
+                  ) : (
+                    <p className="text-red-500 text-xs mt-2">Please select a location on the map</p>
+                  )}
+                </div>
+
+                {/* Address Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      {...register('city', { 
+                        required: selectedRole === 'pharmacy' ? 'City is required' : false 
+                      })}
+                      type="text"
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        errors.city ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                      } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                      placeholder="City"
+                    />
+                    {errors.city && (
+                      <p className="text-red-500 text-xs mt-1">{errors.city.message}</p>
+                    )}
                   </div>
-                )}
-              </div>
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      State/Region <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      {...register('state', { 
+                        required: selectedRole === 'pharmacy' ? 'State/Region is required' : false 
+                      })}
+                      type="text"
+                      className={`w-full px-3 py-2 rounded-lg border ${
+                        errors.state ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                      } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                      placeholder="State/Region"
+                    />
+                    {errors.state && (
+                      <p className="text-red-500 text-xs mt-1">{errors.state.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Street Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    {...register('address', { 
+                      required: selectedRole === 'pharmacy' ? 'Street address is required' : false 
+                    })}
+                    type="text"
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      errors.address ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                    } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                    placeholder="Street address"
+                  />
+                  {errors.address && (
+                    <p className="text-red-500 text-xs mt-1">{errors.address.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    ZIP/Postal Code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    {...register('zipCode', { 
+                      required: selectedRole === 'pharmacy' ? 'ZIP/Postal code is required' : false 
+                    })}
+                    type="text"
+                    className={`w-full px-3 py-2 rounded-lg border ${
+                      errors.zipCode ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+                    } focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all dark:bg-gray-900 dark:text-gray-100`}
+                    placeholder="ZIP/Postal code"
+                  />
+                  {errors.zipCode && (
+                    <p className="text-red-500 text-xs mt-1">{errors.zipCode.message}</p>
+                  )}
+                </div>
+              </>
             )}
 
             {/* Submit Button */}
