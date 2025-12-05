@@ -350,17 +350,12 @@ const Register = () => {
                 <option value="patient">Patient - Order and manage prescriptions</option>
                 <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
                 <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
-                <option value="admin">Administrator - System management</option>
-                <option value="government">Government Official - Regulatory oversight and monitoring</option>
               </select>
               {errors.role && (
                 <p className="text-red-500 text-xs mt-1">{errors.role.message}</p>
               )}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Select the role that best describes how you'll use TenaMed.
-              </p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                <span className="font-medium">Note:</span> Government and Admin roles require additional verification.
               </p>
             </div>
 
@@ -425,7 +420,7 @@ const Register = () => {
                 to="/login"
                 onClick={(e) => {
                   e.preventDefault();
-                  e.stopPropagation(); // Prevent form submission
+                  e.stopPropagation();
                   navigate('/login');
                 }}
                 className="font-medium text-blue-600 dark:text-blue-300 hover:text-blue-500 hover:underline"

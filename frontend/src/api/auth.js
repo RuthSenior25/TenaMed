@@ -1,6 +1,34 @@
 // frontend/src/api/auth.js
 import axios from 'axios';
 
+// Hardcoded admin and government accounts
+const HARDCODED_ACCOUNTS = {
+  admin: {
+    email: 'admin@tenamed.com',
+    password: 'TenaMedAdmin2023!',
+    role: 'admin',
+    user: {
+      id: 'admin-001',
+      firstName: 'System',
+      lastName: 'Admin',
+      email: 'admin@tenamed.com',
+      role: 'admin'
+    }
+  },
+  government: {
+    email: 'government@tenamed.com',
+    password: 'TenaMedGov2023!',
+    role: 'government',
+    user: {
+      id: 'gov-001',
+      firstName: 'Government',
+      lastName: 'Official',
+      email: 'government@tenamed.com',
+      role: 'government'
+    }
+  }
+};
+
 // Helper function to clean and format the base URL
 const getBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -22,7 +50,8 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    // Skip adding auth header for hardcoded accounts
+    if (token && !token.startsWith('hardcoded-token-')) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -52,6 +81,24 @@ export const authAPI = {
   // Login user
   login: async (credentials) => {
     try {
+      // Check against hardcoded accounts first
+      const hardcodedUser = Object.values(HARDCODED_ACCOUNTS).find(
+        acc => acc.email === credentials.email && acc.password === credentials.password
+      );
+
+      if (hardcodedUser) {
+        localStorage.setItem('token', `hardcoded-token-${hardcodedUser.role}`);
+        localStorage.setItem('user', JSON.stringify(hardcodedUser.user));
+        return { 
+          success: true, 
+          data: {
+            token: `hardcoded-token-${hardcodedUser.role}`,
+            user: hardcodedUser.user
+          }
+        };
+      }
+
+      // Proceed with normal login if not a hardcoded account
       const response = await api.post('/auth/login', credentials);
       console.log('Login response:', response.data);
       
@@ -78,9 +125,14 @@ export const authAPI = {
     }
   },
 
-  // Register new user
+  // Register new user (without admin/government options)
   register: async (userData) => {
     try {
+      // Prevent registration with admin/government roles
+      if (userData.role === 'admin' || userData.role === 'government') {
+        throw new Error('Registration with this role is not allowed');
+      }
+      
       const response = await api.post('/auth/register', userData);
       return { success: true, data: response.data };
     } catch (error) {
@@ -95,6 +147,14 @@ export const authAPI = {
   // Get current user profile
   getProfile: async () => {
     try {
+      const token = localStorage.getItem('token');
+      
+      // Handle hardcoded accounts
+      if (token && token.startsWith('hardcoded-token-')) {
+        const role = token.replace('hardcoded-token-', '');
+        return HARDCODED_ACCOUNTS[role]?.user || null;
+      }
+      
       const response = await api.get('/auth/me');
       return response.data;
     } catch (error) {
@@ -109,6 +169,16 @@ export const authAPI = {
       const token = localStorage.getItem('token');
       if (!token) return { valid: false };
       
+      // Handle hardcoded tokens
+      if (token.startsWith('hardcoded-token-')) {
+        const role = token.replace('hardcoded-token-', '');
+        const account = HARDCODED_ACCOUNTS[role];
+        return { 
+          valid: true, 
+          user: account?.user || null 
+        };
+      }
+      
       const response = await api.get('/auth/verify-token');
       return { valid: true, user: response.data.user };
     } catch (error) {
@@ -120,6 +190,13 @@ export const authAPI = {
   // Update user profile
   updateProfile: async (profileData) => {
     try {
+      const token = localStorage.getItem('token');
+      
+      // Prevent updating hardcoded accounts
+      if (token && token.startsWith('hardcoded-token-')) {
+        throw new Error('Cannot update hardcoded admin/government accounts');
+      }
+      
       const response = await api.put('/auth/profile', profileData);
       if (response.data.user) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -134,7 +211,12 @@ export const authAPI = {
   // Logout user
   logout: async () => {
     try {
-      await api.post('/auth/logout');
+      const token = localStorage.getItem('token');
+      
+      // Only call logout API for non-hardcoded accounts
+      if (token && !token.startsWith('hardcoded-token-')) {
+        await api.post('/auth/logout');
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
