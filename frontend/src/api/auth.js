@@ -1,53 +1,7 @@
 // frontend/src/api/auth.js
 import axios from 'axios';
 
-// Helper function to get base URL
-const getBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  let cleanUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
-  return `${cleanUrl}/api`;
-};
-
-// Create axios instance
-const api = axios.create({
-  baseURL: getBaseUrl(),
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token && !token.startsWith('hardcoded-token-')) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Hardcoded accounts
+// Hardcoded admin and government accounts
 const HARDCODED_ACCOUNTS = {
   admin: {
     email: 'admin@tenamed.com',
@@ -58,8 +12,7 @@ const HARDCODED_ACCOUNTS = {
       firstName: 'System',
       lastName: 'Admin',
       email: 'admin@tenamed.com',
-      role: 'admin',
-      isApproved: true
+      role: 'admin'
     }
   },
   government: {
@@ -71,68 +24,60 @@ const HARDCODED_ACCOUNTS = {
       firstName: 'Government',
       lastName: 'Official',
       email: 'government@tenamed.com',
-      role: 'government',
-      isApproved: true
+      role: 'government'
     }
   }
 };
 
-// Auth API methods
-const authAPI = {
-  // Register new user
-  register: async (userData) => {
-    try {
-      // Prevent registration with hardcoded emails
-      const hardcodedEmails = Object.values(HARDCODED_ACCOUNTS).map(acc => acc.email);
-      if (hardcodedEmails.includes(userData.email.toLowerCase())) {
-        throw new Error('This email is reserved for system use');
-      }
+// Helper function to clean and format the base URL
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  let cleanUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  return `${cleanUrl}/api`;
+};
 
-      // Add pharmacy-specific data if role is pharmacy
-      if (userData.role === 'pharmacy') {
-        userData = {
-          ...userData,
-          isApproved: false, // New pharmacies need approval
-          pharmacyInfo: {
-            name: userData.pharmacyName,
-            location: userData.location,
-            address: {
-              street: userData.profile.address,
-              city: userData.profile.city,
-              state: userData.profile.state,
-              zipCode: userData.profile.zipCode,
-              country: 'Ethiopia'
-            },
-            contact: {
-              phone: userData.profile.phone,
-              email: userData.email
-            }
-          }
-        };
-      }
-
-      const response = await api.post('/auth/register', userData);
-      
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-      }
-      
-      return { 
-        success: true, 
-        data: response.data,
-        message: 'Registration successful!'
-      };
-    } catch (error) {
-      console.error('Registration error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      throw error;
-    }
+// Create axios instance with base configuration
+const api = axios.create({
+  baseURL: getBaseUrl(),
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
   },
+  withCredentials: true
+});
 
+// Request interceptor to include auth token in headers
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    // Skip adding auth header for hardcoded accounts
+    if (token && !token.startsWith('hardcoded-token-')) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle common errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API endpoints
+export const authAPI = {
   // Login user
   login: async (credentials) => {
     try {
@@ -153,17 +98,48 @@ const authAPI = {
         };
       }
 
-      // Proceed with normal login
+      // Proceed with normal login if not a hardcoded account
       const response = await api.post('/auth/login', credentials);
+      console.log('Login response:', response.data);
       
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (response.data.status === 'success') {
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
+        if (response.data.user) {
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+        } else if (response.data.result) {
+          localStorage.setItem('user', JSON.stringify(response.data.result));
+        }
+        return { success: true, data: response.data };
+      } else {
+        throw new Error(response.data.message || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login API error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
+  // Register new user (without admin/government options)
+  register: async (userData) => {
+    try {
+      // Prevent registration with admin/government roles
+      if (userData.role === 'admin' || userData.role === 'government') {
+        throw new Error('Registration with this role is not allowed');
       }
       
+      const response = await api.post('/auth/register', userData);
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Registration error:', {
+        message: error.message,
+        response: error.response?.data
+      });
       throw error;
     }
   },
@@ -176,8 +152,7 @@ const authAPI = {
       // Handle hardcoded accounts
       if (token && token.startsWith('hardcoded-token-')) {
         const role = token.replace('hardcoded-token-', '');
-        const account = HARDCODED_ACCOUNTS[role];
-        return account ? account.user : null;
+        return HARDCODED_ACCOUNTS[role]?.user || null;
       }
       
       const response = await api.get('/auth/me');
@@ -198,12 +173,10 @@ const authAPI = {
       if (token.startsWith('hardcoded-token-')) {
         const role = token.replace('hardcoded-token-', '');
         const account = HARDCODED_ACCOUNTS[role];
-        if (!account) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          return { valid: false };
-        }
-        return { valid: true, user: account.user };
+        return { 
+          valid: true, 
+          user: account?.user || null 
+        };
       }
       
       const response = await api.get('/auth/verify-token');
@@ -269,4 +242,4 @@ const authAPI = {
   }
 };
 
-export default authAPI;
+export default api;
