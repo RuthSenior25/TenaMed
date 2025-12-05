@@ -1,4 +1,3 @@
-// frontend/src/pages/Register.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -15,7 +14,6 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [pharmacyLocation, setPharmacyLocation] = useState(null);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [selectedRole, setSelectedRole] = useState('');
   const [pharmacyName, setPharmacyName] = useState('');
 
@@ -74,11 +72,13 @@ const Register = () => {
       if (data.role === 'pharmacy') {
         registrationData.pharmacyName = pharmacyName.trim();
         registrationData.location = {
-          lat: pharmacyLocation.lat,
-          lng: pharmacyLocation.lng
+          type: 'Point',
+          coordinates: [pharmacyLocation.lng, pharmacyLocation.lat] // MongoDB expects [longitude, latitude]
         };
       }
 
+      console.log('Sending registration data:', registrationData);
+      
       const result = await registerUser(registrationData);
       console.log('Register result:', result);
       
@@ -320,7 +320,6 @@ const Register = () => {
                   required: 'Please select your role',
                   onChange: (e) => {
                     setSelectedRole(e.target.value);
-                    setShowLocationPicker(e.target.value === 'pharmacy');
                   }
                 })}
                 className={`w-full px-3 py-2 rounded-lg border ${
@@ -393,7 +392,7 @@ const Register = () => {
                     </label>
                     <input
                       {...register('city', { 
-                        required: selectedRole === 'pharmacy' ? 'City is required' : false 
+                        required: 'City is required'
                       })}
                       type="text"
                       className={`w-full px-3 py-2 rounded-lg border ${
@@ -411,7 +410,7 @@ const Register = () => {
                     </label>
                     <input
                       {...register('state', { 
-                        required: selectedRole === 'pharmacy' ? 'State/Region is required' : false 
+                        required: 'State/Region is required'
                       })}
                       type="text"
                       className={`w-full px-3 py-2 rounded-lg border ${
@@ -431,7 +430,7 @@ const Register = () => {
                   </label>
                   <input
                     {...register('address', { 
-                      required: selectedRole === 'pharmacy' ? 'Street address is required' : false 
+                      required: 'Street address is required'
                     })}
                     type="text"
                     className={`w-full px-3 py-2 rounded-lg border ${
@@ -450,7 +449,7 @@ const Register = () => {
                   </label>
                   <input
                     {...register('zipCode', { 
-                      required: selectedRole === 'pharmacy' ? 'ZIP/Postal code is required' : false 
+                      required: 'ZIP/Postal code is required'
                     })}
                     type="text"
                     className={`w-full px-3 py-2 rounded-lg border ${
