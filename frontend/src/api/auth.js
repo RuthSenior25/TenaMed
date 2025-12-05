@@ -3,13 +3,8 @@ import axios from 'axios';
 
 // Helper function to clean and format the base URL
 const getBaseUrl = () => {
-  // Get the base URL from environment variable
   const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-  
-  // Remove trailing slashes and any existing /api
   let cleanUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
-  
-  // Add a single /api at the end
   return `${cleanUrl}/api`;
 };
 
@@ -58,15 +53,27 @@ export const authAPI = {
   login: async (credentials) => {
     try {
       const response = await api.post('/auth/login', credentials);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
+      console.log('Login response:', response.data);
+      
+      if (response.data.status === 'success') {
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+        }
         if (response.data.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user));
+        } else if (response.data.result) {
+          localStorage.setItem('user', JSON.stringify(response.data.result));
         }
+        return { success: true, data: response.data };
+      } else {
+        throw new Error(response.data.message || 'Login failed');
       }
-      return response.data;
     } catch (error) {
-      console.error('Login API error:', error);
+      console.error('Login API error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       throw error;
     }
   },
@@ -75,14 +82,17 @@ export const authAPI = {
   register: async (userData) => {
     try {
       const response = await api.post('/auth/register', userData);
-      return response.data;
+      return { success: true, data: response.data };
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration error:', {
+        message: error.message,
+        response: error.response?.data
+      });
       throw error;
     }
   },
 
-  // Other auth methods...
+  // Get current user profile
   getProfile: async () => {
     try {
       const response = await api.get('/auth/me');
@@ -93,10 +103,12 @@ export const authAPI = {
     }
   },
 
+  // Verify token
   verifyToken: async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return { valid: false };
+      
       const response = await api.get('/auth/verify-token');
       return { valid: true, user: response.data.user };
     } catch (error) {
@@ -105,6 +117,7 @@ export const authAPI = {
     }
   },
 
+  // Update user profile
   updateProfile: async (profileData) => {
     try {
       const response = await api.put('/auth/profile', profileData);
@@ -118,6 +131,7 @@ export const authAPI = {
     }
   },
 
+  // Logout user
   logout: async () => {
     try {
       await api.post('/auth/logout');
@@ -129,15 +143,18 @@ export const authAPI = {
     }
   },
 
+  // Check if user is authenticated
   isAuthenticated: () => {
     return !!localStorage.getItem('token');
   },
 
+  // Get current user
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
 
+  // Get auth token
   getToken: () => {
     return localStorage.getItem('token');
   }
