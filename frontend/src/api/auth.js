@@ -31,7 +31,9 @@ const HARDCODED_ACCOUNTS = {
 
 // Helper function to clean and format the base URL
 const getBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  // First try environment variable, then fallback to production URL
+  const envUrl = import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com';
+  // Clean up the URL to ensure it ends with /api
   let cleanUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
   return `${cleanUrl}/api`;
 };
@@ -39,11 +41,11 @@ const getBaseUrl = () => {
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 10000,
+  timeout: 30000, // Increased timeout to 30 seconds
   headers: {
     'Content-Type': 'application/json',
-  },
-  withCredentials: true
+    'Accept': 'application/json'
+  }
 });
 
 // Request interceptor to include auth token in headers
@@ -65,7 +67,18 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    console.error('API Error:', {
+      message: error.message,
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'Request timeout. Please check your internet connection.';
+    } else if (!error.response) {
+      error.message = 'Network error. Please check your internet connection.';
+    } else if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (window.location.pathname !== '/login') {
@@ -81,6 +94,8 @@ export const authAPI = {
   // Login user
   login: async (credentials) => {
     try {
+      console.log('Attempting login with URL:', `${getBaseUrl()}/auth/login`);
+
       // Check against hardcoded accounts first
       const hardcodedUser = Object.values(HARDCODED_ACCOUNTS).find(
         acc => acc.email === credentials.email && acc.password === credentials.password
@@ -102,7 +117,7 @@ export const authAPI = {
       const response = await api.post('/auth/login', credentials);
       console.log('Login response:', response.data);
       
-      if (response.data.status === 'success') {
+      if (response.data.status === 'success' || response.data.token) {
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
         }
@@ -119,7 +134,8 @@ export const authAPI = {
       console.error('Login API error:', {
         message: error.message,
         response: error.response?.data,
-        status: error.response?.status
+        status: error.response?.status,
+        config: error.config
       });
       throw error;
     }
