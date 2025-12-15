@@ -2130,8 +2130,31 @@ const DashboardRouter = () => {
             </div>
             <div className="mt-6">
               <button 
-                onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/auth/me', {
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                      }
+                    });
+                    
+                    if (!response.ok) throw new Error('Failed to check status');
+                    
+                    const userData = await response.json();
+                    
+                    if (userData.user?.isApproved) {
+                      // If approved, reload to show the pharmacy dashboard
+                      window.location.reload();
+                    } else {
+                      // If still pending, show a message
+                      alert('Your pharmacy is still under review. Please check back later.');
+                    }
+                  } catch (error) {
+                    console.error('Error checking status:', error);
+                    alert('Failed to check status. Please try again.');
+                  }
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 Check Status
               </button>
