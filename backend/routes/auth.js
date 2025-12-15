@@ -95,32 +95,62 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    // Enhanced error logging
+    console.error('Registration error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      keyValue: error.keyValue,
+      errors: error.errors ? Object.entries(error.errors).map(([key, value]) => ({
+        field: key,
+        message: value.message,
+        type: value.kind
+      })) : null,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
     
     // Handle validation errors
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
+      const messages = Object.values(error.errors).map(val => ({
+        field: val.path,
+        message: val.message,
+        type: val.kind
+      }));
       return res.status(400).json({
         success: false,
-        message: 'Validation error',
+        message: 'Validation failed',
         errors: messages
       });
     }
 
     // Handle duplicate key errors
     if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
       return res.status(400).json({
         success: false,
-        message: 'Email or username already exists'
+        message: `A user with this ${field} already exists`,
+        field,
+        value: error.keyValue[field]
       });
     }
 
     // Handle other errors
-    res.status(500).json({ 
+    const errorResponse = {
       success: false,
-      message: 'Server error during registration',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+      message: 'An error occurred during registration',
+      error: error.message
+    };
+
+    // Add more details in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = {
+        name: error.name,
+        code: error.code,
+        stack: error.stack
+      };
+    }
+
+    res.status(500).json(errorResponse);
   }
 });
 
