@@ -36,6 +36,22 @@ const userSchema = new mongoose.Schema({
     dateOfBirth: { type: Date },
     gender: { type: String, enum: ['male', 'female', 'other'] }
   },
+  pharmacyName: {
+    type: String,
+    required: function() {
+      return this.role === 'pharmacy';
+    }
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: function() {
+      return this.role === 'pharmacy' ? 'pending' : 'approved';
+    }
+  },
+  rejectionReason: {
+    type: String
+  },
   isActive: {
     type: Boolean,
     default: true

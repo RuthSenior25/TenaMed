@@ -198,22 +198,27 @@ router.post('/logout', async (req, res) => {
 router.get('/pending-pharmacies', async (req, res) => {
   try {
     // Verify admin role
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
+    const authHeader = req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = authHeader.substring(7);
+    const { verifyToken } = require('../middleware/auth');
+    const decoded = verifyToken(token);
+
     const adminUser = await User.findById(decoded.id);
-    
     if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    // Find all unapproved pharmacy users with their profiles
-    const pendingPharmacies = await User.find({ 
-      role: 'pharmacy', 
-      isApproved: false 
+    // Find all pending pharmacy registrations
+    const pendingPharmacies = await User.find({
+      role: 'pharmacy',
+      $or: [
+        { isApproved: false },
+        { status: 'pending' }
+      ]
     }).select('-password').populate('profile');
 
     res.json(pendingPharmacies);
@@ -278,6 +283,55 @@ router.patch('/pharmacy/:id/status', async (req, res) => {
   } catch (error) {
     console.error('Error updating pharmacy status:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Update pharmacy status (Approve/Reject)
+router.patch('/pharmacy/:id/status', async (req, res) => {
+  try {
+    const { status, rejectionReason } = req.body;
+    
+    // Verify admin role
+    const authHeader = req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    const token = authHeader.substring(7);
+    const { verifyToken } = require('../middleware/auth');
+    const decoded = verifyToken(token);
+
+    const adminUser = await User.findById(decoded.id);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Validate status
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    // Find and update the pharmacy
+    const updateData = { 
+      isApproved: status === 'approved',
+      status,
+      ...(status === 'rejected' && { rejectionReason })
+    };
+
+    const updatedPharmacy = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedPharmacy) {
+      return res.status(404).json({ message: 'Pharmacy not found' });
+    }
+
+    res.json(updatedPharmacy);
+  } catch (error) {
+    console.error('Error updating pharmacy status:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
