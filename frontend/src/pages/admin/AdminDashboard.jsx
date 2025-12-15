@@ -129,12 +129,19 @@ const AdminDashboard = () => {
   // Fetch pending pharmacy requests
   const fetchPharmacyRequests = async () => {
     try {
+      console.log('Fetching pending pharmacy requests...');
       setIsLoading(true);
       const response = await api.get('/auth/pending-pharmacies');
+      console.log('Received pharmacy requests:', response.data);
       setPharmacyRequests(response.data);
     } catch (error) {
       console.error('Error fetching pharmacy requests:', error);
-      toast.error('Failed to load pharmacy requests');
+      if (error.response) {
+        console.error('Response error:', error.response.data);
+        toast.error(`Error: ${error.response.data.message || 'Failed to load pharmacy requests'}`);
+      } else {
+        toast.error('Network error. Please check your connection.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -64,10 +64,12 @@ router.post('/register', validateUserRegistration, async (req, res) => {
 router.post('/login', validateUserLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('Login attempt for email:', email);
 
     // Find user by email
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -79,8 +81,19 @@ router.post('/login', validateUserLogin, async (req, res) => {
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
+      console.log('Invalid password for user:', email);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
+
+    // Log user details for debugging
+    console.log('User login details:', {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      isApproved: user.isApproved,
+      status: user.status,
+      createdAt: user.createdAt
+    });
 
     // Generate token
     const token = generateToken({ id: user._id, role: user.role });
@@ -213,14 +226,23 @@ router.get('/pending-pharmacies', async (req, res) => {
     }
 
     // Find all pending pharmacy registrations
-    const pendingPharmacies = await User.find({
+    const query = {
       role: 'pharmacy',
       $or: [
         { isApproved: false },
-        { status: 'pending' }
+        { status: 'pending' },
+        { status: { $exists: false } } // Include users where status field doesn't exist
       ]
-    }).select('-password').populate('profile');
+    };
+    
+    console.log('Pending pharmacies query:', JSON.stringify(query, null, 2));
+    
+    const pendingPharmacies = await User.find(query)
+      .select('-password')
+      .populate('profile')
+      .lean();
 
+    console.log(`Found ${pendingPharmacies.length} pending pharmacies`);
     res.json(pendingPharmacies);
   } catch (error) {
     console.error('Error fetching pending pharmacies:', error);
