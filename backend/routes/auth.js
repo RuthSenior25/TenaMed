@@ -9,7 +9,16 @@ const { validateUserRegistration, validateUserLogin } = require('../middleware/v
 // Register new user
 router.post('/register', validateUserRegistration, async (req, res) => {
   try {
-    const { username, email, password, role, profile } = req.body;
+    const { username, email, password, role, profile, pharmacyName } = req.body;
+
+    // Log the incoming request for debugging
+    console.log('Registration attempt:', { 
+      username, 
+      email, 
+      role,
+      hasProfile: !!profile,
+      pharmacyName 
+    });
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -18,20 +27,39 @@ router.post('/register', validateUserRegistration, async (req, res) => {
 
     if (existingUser) {
       return res.status(400).json({
+        success: false,
         message: 'User already exists with this email or username'
       });
     }
 
-    // Create new user
-    const user = new User({
+    // Additional validation for pharmacy registration
+    if (role === 'pharmacy' && !pharmacyName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pharmacy name is required'
+      });
+    }
+
+    // Create user data object
+    const userData = {
       username,
       email,
       password,
       role,
       profile,
-      isApproved: role === 'patient' || role === 'admin' // Auto-approve patients and admins
-    });
+      isApproved: role !== 'pharmacy', // Only auto-approve non-pharmacy users
+      status: role === 'pharmacy' ? 'pending' : 'approved'
+    };
 
+    // Add pharmacy name if role is pharmacy
+    if (role === 'pharmacy') {
+      userData.pharmacyName = pharmacyName;
+    }
+
+    // Create new user
+    const user = new User(userData);
+
+    // Save user to database
     await user.save();
 
     // Generate token
@@ -41,22 +69,58 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
+    // Prepare response data
+    const userResponse = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      profile: user.profile,
+      isApproved: user.isApproved,
+      status: user.status,
+      isActive: user.isActive
+    };
+
+    // Add pharmacy name to response if available
+    if (user.pharmacyName) {
+      userResponse.pharmacyName = user.pharmacyName;
+    }
+
     res.status(201).json({
-      message: 'User registered successfully',
+      success: true,
+      message: 'Registration successful. ' + 
+        (role === 'pharmacy' ? 'Your account is pending admin approval.' : ''),
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-        isApproved: user.isApproved,
-        isActive: user.isActive
-      }
+      user: userResponse
     });
+
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: messages
+      });
+    }
+
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email or username already exists'
+      });
+    }
+
+    // Handle other errors
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
