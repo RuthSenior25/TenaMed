@@ -126,22 +126,71 @@ const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fetch pending pharmacy requests
-  const fetchPharmacyRequests = async () => {
+  // Fetch pending pharmacy requests with retry logic
+  const fetchPharmacyRequests = async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    
     try {
-      console.log('Fetching pending pharmacy requests...');
+      console.log(`[${new Date().toISOString()}] Fetching pending pharmacy requests...`);
       setIsLoading(true);
-      const response = await api.get('/auth/pending-pharmacies');
+      
+      // Clear any previous errors
+      setPharmacyRequests(prev => prev.length > 0 ? prev : []);
+      
+      const response = await api.get('/auth/pending-pharmacies', {
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       console.log('Received pharmacy requests:', response.data);
+      
+      if (!Array.isArray(response.data)) {
+        throw new Error('Invalid response format from server');
+      }
+      
       setPharmacyRequests(response.data);
+      
+      // If we had to retry, show success message
+      if (retryCount > 0) {
+        toast.success('Pharmacy requests loaded successfully');
+      }
+      
     } catch (error) {
       console.error('Error fetching pharmacy requests:', error);
+      
+      // If we have retries left and it's a network error, retry
+      if (retryCount < MAX_RETRIES && 
+          (!error.response || error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK')) {
+        console.log(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+        // Wait 1 second before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchPharmacyRequests(retryCount + 1);
+      }
+      
+      // Show appropriate error message
       if (error.response) {
         console.error('Response error:', error.response.data);
-        toast.error(`Error: ${error.response.data.message || 'Failed to load pharmacy requests'}`);
+        const errorMessage = error.response.data?.message || 'Failed to load pharmacy requests';
+        toast.error(`Error: ${errorMessage}`);
+        
+        // If it's an auth error, suggest re-login
+        if (error.response.status === 401) {
+          toast.error('Your session may have expired. Please log in again.', {
+            duration: 5000
+          });
+        }
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error('Request timed out. Please check your connection and try again.');
       } else {
-        toast.error('Network error. Please check your connection.');
+        toast.error('Failed to load pharmacy requests. Please try again.');
       }
+      
+      // Set empty array to clear any previous data
+      setPharmacyRequests([]);
+      
     } finally {
       setIsLoading(false);
     }

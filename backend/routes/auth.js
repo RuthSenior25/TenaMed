@@ -226,23 +226,39 @@ router.get('/pending-pharmacies', async (req, res) => {
     }
 
     // Find all pending pharmacy registrations
+    // More comprehensive query to catch all possible pending states
     const query = {
       role: 'pharmacy',
       $or: [
         { isApproved: false },
+        { isApproved: { $exists: false } }, // In case isApproved is not set
         { status: 'pending' },
-        { status: { $exists: false } } // Include users where status field doesn't exist
+        { status: { $exists: false } }, // In case status is not set
+        { 
+          $and: [
+            { isApproved: { $ne: true } }, // Not explicitly approved
+            { status: { $ne: 'approved' } } // And status is not approved
+          ]
+        }
       ]
     };
     
     console.log('Pending pharmacies query:', JSON.stringify(query, null, 2));
     
-    const pendingPharmacies = await User.find(query)
+    // First get all matching users
+    let pendingPharmacies = await User.find(query)
       .select('-password')
       .populate('profile')
       .lean();
+      
+    // Additional filtering to ensure we don't include approved pharmacies
+    pendingPharmacies = pendingPharmacies.filter(pharmacy => {
+      const isApproved = pharmacy.isApproved === true || pharmacy.status === 'approved';
+      const isRejected = pharmacy.status === 'rejected';
+      return !isApproved && !isRejected;
+    });
 
-    console.log(`Found ${pendingPharmacies.length} pending pharmacies`);
+    console.log(`Found ${pendingPharmacies.length} pending pharmacies after filtering`);
     res.json(pendingPharmacies);
   } catch (error) {
     console.error('Error fetching pending pharmacies:', error);
