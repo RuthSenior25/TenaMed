@@ -2,77 +2,181 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import api from '../../api/axiosConfig';
+
+// Rejection Modal Component
+const RejectionModal = ({ isOpen, onClose, onConfirm, pharmacy, isLoading }) => {
+  const [reason, setReason] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Reject Pharmacy Registration
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Please provide a reason for rejecting {pharmacy?.pharmacyName || 'this pharmacy'}.
+          This will be sent to the pharmacy owner.
+        </p>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2 mb-4 h-32"
+          placeholder="Enter reason for rejection..."
+        />
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={!reason.trim() || isLoading}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Processing...' : 'Confirm Rejection'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Pharmacy Request Item Component
+const PharmacyRequestItem = ({ pharmacy, onApprove, onReject }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+
+  const handleApprove = async () => {
+    try {
+      setIsLoading(true);
+      await onApprove(pharmacy._id);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReject = async (reason) => {
+    try {
+      setIsLoading(true);
+      await onReject(pharmacy._id, reason);
+      setShowRejectModal(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-medium text-gray-900">
+          {pharmacy.pharmacyName || 'N/A'}
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm text-gray-900">
+          {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}
+        </div>
+        <div className="text-sm text-gray-500">{pharmacy.email}</div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {pharmacy.profile?.phone || 'N/A'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {new Date(pharmacy.createdAt).toLocaleDateString()}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+        <button
+          onClick={handleApprove}
+          disabled={isLoading}
+          className="text-green-600 hover:text-green-900 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? 'Processing...' : 'Approve'}
+        </button>
+        <button
+          onClick={() => setShowRejectModal(true)}
+          disabled={isLoading}
+          className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Reject
+        </button>
+      </td>
+      {showRejectModal && (
+        <RejectionModal
+          isOpen={showRejectModal}
+          onClose={() => setShowRejectModal(false)}
+          onConfirm={handleReject}
+          pharmacy={pharmacy}
+          isLoading={isLoading}
+        />
+      )}
+    </tr>
+  );
+};
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [pharmacyRequests, setPharmacyRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Mock data for pharmacy requests
+  // Fetch pending pharmacy requests
+  const fetchPharmacyRequests = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get('/auth/pending-pharmacies');
+      setPharmacyRequests(response.data);
+    } catch (error) {
+      console.error('Error fetching pharmacy requests:', error);
+      toast.error('Failed to load pharmacy requests');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle pharmacy approval
+  const handleApprovePharmacy = async (pharmacyId) => {
+    try {
+      setIsProcessing(true);
+      await api.patch(`/auth/pharmacy/${pharmacyId}/status`, { status: 'approved' });
+      toast.success('Pharmacy approved successfully');
+      await fetchPharmacyRequests(); // Refresh the list
+    } catch (error) {
+      console.error('Error approving pharmacy:', error);
+      toast.error(error.response?.data?.message || 'Failed to approve pharmacy');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle pharmacy rejection
+  const handleRejectPharmacy = async (pharmacyId, reason) => {
+    try {
+      setIsProcessing(true);
+      await api.patch(`/auth/pharmacy/${pharmacyId}/status`, { 
+        status: 'rejected',
+        rejectionReason: reason
+      });
+      toast.success('Pharmacy rejected successfully');
+      await fetchPharmacyRequests(); // Refresh the list
+    } catch (error) {
+      console.error('Error rejecting pharmacy:', error);
+      toast.error(error.response?.data?.message || 'Failed to reject pharmacy');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Load pharmacy requests on component mount
   useEffect(() => {
-    const fetchPharmacyRequests = async () => {
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Mock data
-        const mockRequests = [
-          {
-            id: 'ph1',
-            name: 'Bole City Pharmacy',
-            owner: 'John Doe',
-            email: 'john@bolepharmacy.com',
-            phone: '+251911223344',
-            status: 'pending',
-            registrationDate: '2025-11-20',
-          },
-          {
-            id: 'ph2',
-            name: 'Gerji Health Hub',
-            owner: 'Jane Smith',
-            email: 'jane@gerjipharmacy.com',
-            phone: '+251911556677',
-            status: 'pending',
-            registrationDate: '2025-11-19',
-          },
-        ];
-        
-        setPharmacyRequests(mockRequests);
-      } catch (error) {
-        console.error('Error fetching pharmacy requests:', error);
-        toast.error('Failed to load pharmacy requests');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchPharmacyRequests();
   }, []);
-
-  const handleApprove = (pharmacyId) => {
-    // In a real app, this would be an API call
-    setPharmacyRequests(prev => 
-      prev.map(pharmacy => 
-        pharmacy.id === pharmacyId 
-          ? { ...pharmacy, status: 'approved' } 
-          : pharmacy
-      )
-    );
-    toast.success('Pharmacy approved successfully');
-  };
-
-  const handleReject = (pharmacyId) => {
-    // In a real app, this would be an API call
-    setPharmacyRequests(prev => 
-      prev.map(pharmacy => 
-        pharmacy.id === pharmacyId 
-          ? { ...pharmacy, status: 'rejected' } 
-          : pharmacy
-      )
-    );
-    toast.success('Pharmacy rejected');
-  };
 
   const handleLogout = () => {
     logout();
@@ -80,172 +184,127 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              Welcome back, {user?.firstName}!
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-gray-600">
+              Welcome back, {user?.profile?.firstName || 'Admin'}
             </p>
           </div>
           <button
             onClick={handleLogout}
-            className="mt-4 md:mt-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+            disabled={isProcessing}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Logout
+            {isProcessing ? 'Processing...' : 'Logout'}
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Users</div>
-            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">1,248</div>
-            <div className="mt-2 text-sm text-green-600 dark:text-green-400">+12% from last month</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">Active Pharmacies</div>
-            <div className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">156</div>
-            <div className="mt-2 text-sm text-green-600 dark:text-green-400">+5 new this week</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">Pending Approvals</div>
-            <div className="mt-2 text-3xl font-bold text-amber-600 dark:text-amber-400">
-              {pharmacyRequests.filter(ph => ph.status === 'pending').length}
-            </div>
-            <div className="mt-2 text-sm text-amber-600 dark:text-amber-400">Needs your attention</div>
-          </div>
-        </div>
-
         {/* Pharmacy Approval Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-8">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Pharmacy Registration Requests</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Review and approve new pharmacy registration requests
-            </p>
-          </div>
-          
-          {isLoading ? (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-              Loading pharmacy requests...
+        <div className="bg-white rounded-xl shadow overflow-hidden mb-8">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Pharmacy Registration Requests
+                {pharmacyRequests.length > 0 && (
+                  <span className="ml-2 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                    {pharmacyRequests.length} Pending
+                  </span>
+                )}
+              </h2>
+              <button
+                onClick={fetchPharmacyRequests}
+                disabled={isLoading || isProcessing}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Refresh
+              </button>
             </div>
-          ) : pharmacyRequests.length === 0 ? (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-              No pending pharmacy requests
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Pharmacy Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Owner
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {pharmacyRequests.map((pharmacy) => (
-                    <tr key={pharmacy.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {pharmacy.name}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Registered on {pharmacy.registrationDate}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">{pharmacy.owner}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{pharmacy.email}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {pharmacy.phone}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span 
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            pharmacy.status === 'approved' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                              : pharmacy.status === 'rejected'
-                                ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
-                          }`}
-                        >
-                          {pharmacy.status.charAt(0).toUpperCase() + pharmacy.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {pharmacy.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(pharmacy.id)}
-                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-4"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(pharmacy.id)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {pharmacy.status === 'approved' && (
-                          <span className="text-green-600 dark:text-green-400">Approved</span>
-                        )}
-                        {pharmacy.status === 'rejected' && (
-                          <span className="text-red-600 dark:text-red-400">Rejected</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* System Information */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">System Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">System Version</h3>
-              <p className="text-gray-900 dark:text-white">TenaMed v2.1.0</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Last Updated</h3>
-              <p className="text-gray-900 dark:text-white">November 20, 2025</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Server Status</h3>
-              <div className="flex items-center">
-                <span className="h-2.5 w-2.5 bg-green-500 rounded-full mr-2"></span>
-                <span className="text-gray-900 dark:text-white">All systems operational</span>
+            
+            {isLoading ? (
+              <div className="flex justify-center items-center p-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
               </div>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Database</h3>
-              <p className="text-gray-900 dark:text-white">MongoDB v5.0</p>
-            </div>
+            ) : pharmacyRequests.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pharmacy Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Owner
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Registration Date
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {pharmacyRequests.map((pharmacy) => (
+                      <PharmacyRequestItem
+                        key={pharmacy._id}
+                        pharmacy={pharmacy}
+                        onApprove={handleApprovePharmacy}
+                        onReject={handleRejectPharmacy}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No pending pharmacy registrations</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  All pharmacy registration requests have been processed.
+                </p>
+                <div className="mt-6">
+                  <button
+                    onClick={fetchPharmacyRequests}
+                    disabled={isLoading || isProcessing}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg
+                      className="-ml-1 mr-2 h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Refresh
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

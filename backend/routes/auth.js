@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Pharmacy = require('../models/Pharmacy');
 const { generateToken } = require('../middleware/auth');
@@ -190,6 +191,93 @@ router.post('/logout', async (req, res) => {
   } catch (error) {
     console.error('Logout error:', error);
     res.json({ message: 'Logout successful' }); // Still return success for client-side cleanup
+  }
+});
+
+// Get pending pharmacy registrations (Admin only)
+router.get('/pending-pharmacies', async (req, res) => {
+  try {
+    // Verify admin role
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const adminUser = await User.findById(decoded.id);
+    
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Find all unapproved pharmacy users with their profiles
+    const pendingPharmacies = await User.find({ 
+      role: 'pharmacy', 
+      isApproved: false 
+    }).select('-password').populate('profile');
+
+    res.json(pendingPharmacies);
+  } catch (error) {
+    console.error('Error fetching pending pharmacies:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Approve/Reject pharmacy
+router.patch('/pharmacy/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+    
+    // Verify admin
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const adminUser = await User.findById(decoded.id);
+    
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Find and update pharmacy
+    const pharmacy = await User.findById(id).populate('profile');
+    if (!pharmacy || pharmacy.role !== 'pharmacy') {
+      return res.status(404).json({ message: 'Pharmacy not found' });
+    }
+
+    pharmacy.isApproved = status === 'approved';
+    if (status === 'rejected' && rejectionReason) {
+      pharmacy.rejectionReason = rejectionReason;
+    } else if (status === 'approved') {
+      // Create pharmacy profile if approved
+      const newPharmacy = new Pharmacy({
+        name: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+        owner: pharmacy._id,
+        contact: {
+          email: pharmacy.email,
+          phone: pharmacy.profile?.phone || ''
+        },
+        address: pharmacy.profile?.address || {}
+      });
+      await newPharmacy.save();
+    }
+
+    await pharmacy.save();
+    
+    res.json({ 
+      message: `Pharmacy ${status} successfully`,
+      pharmacy: {
+        id: pharmacy._id,
+        name: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+        status: pharmacy.isApproved ? 'approved' : 'rejected'
+      }
+    });
+  } catch (error) {
+    console.error('Error updating pharmacy status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
