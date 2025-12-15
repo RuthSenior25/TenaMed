@@ -2102,17 +2102,11 @@ const DashboardRouter = () => {
   if (user.isAdmin || user.role === 'admin') {
     return <AdminDashboard />;
   }
-
-  switch (user.role) {
-    case 'patient':
-      return <PatientDashboard />;
-    case 'pharmacy': {
-      // If pharmacy is approved/active, show dashboard
-      if (isPharmacyApproved(user.pharmacy)) {
-        return <PharmacyDashboard activePharmacy={user.pharmacy} />;
-      }
-      
-      // Show pending approval screen for new pharmacy registrations
+  
+  // For pharmacy users, check if they're approved
+  if (user.role === 'pharmacy') {
+    // If pharmacy is not approved, show pending approval screen
+    if (!user.isApproved || user.status === 'pending') {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white rounded-xl shadow-md p-8 text-center">
@@ -2143,10 +2137,8 @@ const DashboardRouter = () => {
                     const userData = await response.json();
                     
                     if (userData.user?.isApproved) {
-                      // If approved, reload to show the pharmacy dashboard
                       window.location.reload();
                     } else {
-                      // If still pending, show a message
                       alert('Your pharmacy is still under review. Please check back later.');
                     }
                   } catch (error) {
@@ -2168,6 +2160,13 @@ const DashboardRouter = () => {
         </div>
       );
     }
+    // If approved, show the pharmacy dashboard
+    return <PharmacyDashboard activePharmacy={user.pharmacy} />;
+  }
+
+  switch (user.role) {
+    case 'patient':
+      return <PatientDashboard />;
     case 'dispatcher':
       return <DispatcherDashboard />;
     case 'supplier':
