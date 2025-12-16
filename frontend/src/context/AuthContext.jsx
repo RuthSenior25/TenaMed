@@ -70,6 +70,27 @@ const authReducer = (state, action) => {
 
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const [logoutTimer, setLogoutTimer] = useState(null);
+
+  // Auto-logout after token expiration
+  const setupLogoutTimer = (expiresIn) => {
+    if (logoutTimer) clearTimeout(logoutTimer);
+    
+    const timeUntilExpiry = expiresIn * 1000 - Date.now();
+    if (timeUntilExpiry > 0) {
+      const timer = setTimeout(() => {
+        logout('Your session has expired. Please log in again.');
+      }, timeUntilExpiry);
+      setLogoutTimer(timer);
+    }
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (logoutTimer) clearTimeout(logoutTimer);
+    };
+  }, [logoutTimer]);
 
   useEffect(() => {
     let isMounted = true;
@@ -122,6 +143,21 @@ export const AuthProvider = ({ children }) => {
       isMounted = false;
     };
   }, []);
+
+  // Check if user has required role(s)
+  const hasRole = (requiredRoles) => {
+    if (!state.user?.role) return false;
+    if (Array.isArray(requiredRoles)) {
+      return requiredRoles.includes(state.user.role);
+    }
+    return state.user.role === requiredRoles;
+  };
+
+  // Check if user has any of the required roles
+  const hasAnyRole = (roles) => {
+    if (!state.user?.role) return false;
+    return roles.includes(state.user.role);
+  };
 
   const login = async (credentials) => {
     try {
@@ -185,7 +221,12 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid response from server');
       }
       
-      const { user, token } = response.data;
+      const { user, token, expiresIn } = response.data;
+      
+      // Set up auto-logout timer if expiresIn is provided
+      if (expiresIn) {
+        setupLogoutTimer(expiresIn);
+      }
 
       // Store the token in local storage
       localStorage.setItem('token', token);
@@ -346,10 +387,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = (message = 'Logged out successfully') => {
     localStorage.removeItem('token');
+    if (logoutTimer) clearTimeout(logoutTimer);
     dispatch({ type: 'LOGOUT' });
-    toast.success('Logged out successfully');
+    if (message) {
+      toast.success(message);
+    }
   };
 
   const updateUser = (userData) => {
@@ -362,6 +406,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    hasRole,
+    hasAnyRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
