@@ -105,7 +105,32 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        // First verify the token is still valid
+        // For admin token (starts with 'admin-'), create the admin user object
+        if (token.startsWith('admin-')) {
+          const adminUser = {
+            _id: ADMIN_CREDENTIALS.id,
+            email: ADMIN_CREDENTIALS.email,
+            role: 'admin',
+            firstName: ADMIN_CREDENTIALS.firstName,
+            lastName: ADMIN_CREDENTIALS.lastName,
+            isAdmin: true,
+            isApproved: true,
+            status: 'active'
+          };
+          
+          if (isMounted) {
+            dispatch({
+              type: 'LOGIN_SUCCESS',
+              payload: { 
+                user: adminUser, 
+                token 
+              },
+            });
+          }
+          return;
+        }
+        
+        // For regular users, verify the token and get profile
         const response = await authAPI.verifyToken();
         
         if (isMounted) {
@@ -170,10 +195,12 @@ export const AuthProvider = ({ children }) => {
         const adminUser = {
           _id: ADMIN_CREDENTIALS.id,
           email: ADMIN_CREDENTIALS.email,
-          role: ADMIN_CREDENTIALS.role,
+          role: 'admin',
           firstName: ADMIN_CREDENTIALS.firstName,
           lastName: ADMIN_CREDENTIALS.lastName,
-          isAdmin: true
+          isAdmin: true,
+          isApproved: true,
+          status: 'active'
         };
         
         // Generate a simple token for admin
