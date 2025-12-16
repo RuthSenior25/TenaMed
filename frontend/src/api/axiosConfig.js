@@ -26,9 +26,25 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized - maybe redirect to login
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Only handle 401 if we're not already on the login page
+      // and if the request was not for the login or register endpoints
+      const currentPath = window.location.pathname;
+      const isAuthRoute = currentPath.includes('/login') || 
+                         currentPath.includes('/register') ||
+                         currentPath.includes('/forgot-password');
+      
+      if (!isAuthRoute) {
+        // Store the current path to redirect back after login
+        localStorage.setItem('redirectAfterLogin', currentPath);
+        // Only remove token if it exists
+        if (localStorage.getItem('token')) {
+          localStorage.removeItem('token');
+          // Use a small delay to allow any ongoing requests to complete
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        }
+      }
     }
     return Promise.reject(error);
   }
