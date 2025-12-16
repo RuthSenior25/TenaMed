@@ -304,49 +304,83 @@ router.post('/logout', async (req, res) => {
 // Get pending pharmacy registrations (Admin only)
 router.get('/pending-pharmacies', async (req, res) => {
   try {
-    // Verify admin role
+    console.log('Received request to /pending-pharmacies');
+    
+    // Verify token and get user
     const authHeader = req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Access denied. No token provided.' });
+      console.log('No token provided');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Access denied. No token provided.' 
+      });
     }
 
-    const token = authHeader.substring(7);
-    const { verifyToken } = require('../middleware/auth');
-    const decoded = verifyToken(token);
-
-    const adminUser = await User.findById(decoded.id);
-    if (!adminUser || adminUser.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized' });
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      console.log('Invalid token format');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid token format' 
+      });
     }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('Decoded token:', decoded);
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid or expired token' 
+      });
+    }
+
+    // Check if user is admin
+    const adminUser = await User.findById(decoded.id).select('-password');
+    if (!adminUser) {
+      console.log('Admin user not found');
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    if (adminUser.role !== 'admin') {
+      console.log('User is not an admin');
+      return res.status(403).json({ 
+        success: false,
+        message: 'Not authorized' 
+      });
+    }
+
+    console.log('Admin verified, fetching pending pharmacies...');
 
     // Find all pending pharmacy registrations
-    // More comprehensive query to catch all possible pending states
     const query = {
       role: 'pharmacy',
       $or: [
         { isApproved: false },
-        { isApproved: { $exists: false } }, // In case isApproved is not set
+        { isApproved: { $exists: false } },
         { status: 'pending' },
-        { status: { $exists: false } }, // In case status is not set
-        { 
-          $and: [
-            { isApproved: { $ne: true } }, // Not explicitly approved
-            { status: { $ne: 'approved' } } // And status is not approved
-          ]
-        }
+        { status: { $exists: false } }
       ]
     };
     
-    console.log('Pending pharmacies query:', JSON.stringify(query, null, 2));
+    console.log('Querying database with:', JSON.stringify(query, null, 2));
     
-    // First get all matching users
-    let pendingPharmacies = await User.find(query)
+    // Get all matching users
+    const pendingPharmacies = await User.find(query)
       .select('-password')
       .populate('profile')
       .lean();
-      
+
+    console.log(`Found ${pendingPharmacies.length} pending pharmacies`);
+
     // Additional filtering to ensure we don't include approved pharmacies
-    pendingPharmacies = pendingPharmacies.filter(pharmacy => {
+    const filteredPharmacies = pendingPharmacies.filter(pharmacy => {
       const isApproved = pharmacy.isApproved === true || pharmacy.status === 'approved';
       const isRejected = pharmacy.status === 'rejected';
       return !isApproved && !isRejected;
