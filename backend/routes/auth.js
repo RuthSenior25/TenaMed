@@ -1,10 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Pharmacy = require('../models/Pharmacy');
 const { generateToken, authenticate } = require('../middleware/auth');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  console.log('✅ Health check passed');
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
 
 // Register new user
 router.post('/register', validateUserRegistration, async (req, res) => {
@@ -303,83 +314,78 @@ router.post('/logout', async (req, res) => {
 
 // Get pending pharmacy registrations (Admin only)
 router.get('/pending-pharmacies', authenticate, async (req, res) => {
-  console.log('🔍 [API] /pending-pharmacies - Request received');
-  console.log('🔑 Authenticated User:', {
-    id: req.user._id,
-    email: req.user.email,
-    role: req.user.role
-  });
-
-  // Check if user is admin
-  if (req.user.role !== 'admin') {
-    console.warn('⚠️ Unauthorized access attempt - User is not an admin');
-    return res.status(403).json({ 
-      success: false,
-      message: 'Not authorized. Admin access required.' 
-    });
-  }
-
+  console.log('🔵 [API] /pending-pharmacies - Request received');
+  
   try {
-    console.log('🔍 [API] Building query for pending pharmacies...');
+    // Verify admin role
+    if (req.user.role !== 'admin') {
+      console.warn('⚠️ Unauthorized access - User is not an admin');
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin access required' 
+      });
+    }
+
+    console.log('🔵 [API] User authenticated as admin, querying DB...');
     
-    // Simplified query to find all pharmacy users first
-    const query = { role: 'pharmacy' };
-    
-    console.log('🔍 [API] Query:', JSON.stringify(query, null, 2));
-    
-    // First, get all pharmacy users with minimal fields
-    console.log('🔍 [API] Fetching pharmacy users...');
+    // Add query timeout and limit
+    const query = { 
+      role: 'pharmacy',
+      $or: [
+        { isApproved: false },
+        { isApproved: { $exists: false } },
+        { status: 'pending' }
+      ]
+    };
+
+    console.log('🔵 [API] Executing DB query...');
     const startTime = Date.now();
     
-    const pharmacyUsers = await User.find(query)
-      .select('_id email role isApproved status createdAt')
-      .lean();
-      
-    console.log(`✅ [API] Found ${pharmacyUsers.length} pharmacy users in ${Date.now() - startTime}ms`);
-    
-    // Filter in-memory for better control and debugging
-    const pendingPharmacies = pharmacyUsers.filter(user => {
-      const isPending = 
-        user.isApproved === false || 
-        (user.status && user.status.toLowerCase() === 'pending') ||
-        (!user.status && !user.isApproved);
-      
-      console.log(`User ${user._id} - isApproved: ${user.isApproved}, status: ${user.status} => ${isPending ? 'PENDING' : 'APPROVED/REJECTED'}`);
-      return isPending;
-    });
-    
-    console.log(`✅ [API] Found ${pendingPharmacies.length} pending pharmacies after filtering`);
-    
-    // If no pending pharmacies, return early
-    if (pendingPharmacies.length === 0) {
-      console.log('ℹ️  No pending pharmacies found');
-      return res.json([]);
+    try {
+      const pharmacies = await User.find(query)
+        .select('-password')
+        .lean()
+        .maxTimeMS(5000) // 5 second timeout
+        .limit(100); // Limit results
+
+      console.log(`✅ [API] Query completed in ${Date.now() - startTime}ms`);
+      console.log(`✅ [API] Found ${pharmacies.length} pharmacies`);
+
+      return res.json(pharmacies);
+    } catch (dbError) {
+      console.error('❌ [API] Database error:', {
+        error: dbError.message,
+        code: dbError.code,
+        name: dbError.name
+      });
+
+      // Handle timeout specifically
+      if (dbError.name === 'MongoError' && dbError.code === 50) {
+        return res.status(504).json({
+          success: false,
+          message: 'Database operation timed out',
+          code: 'DB_TIMEOUT'
+        });
+      }
+
+      throw dbError; // Re-throw to be caught by outer catch
     }
-    
-    // Get full details for pending pharmacies
-    console.log('🔍 [API] Fetching full details for pending pharmacies...');
-    const pendingIds = pendingPharmacies.map(p => p._id);
-    
-    const detailedPharmacies = await User.find({ _id: { $in: pendingIds } })
-      .select('-password')
-      .populate('profile')
-      .lean();
-    
-    console.log(`✅ [API] Fetched details for ${detailedPharmacies.length} pharmacies`);
-    
-    res.json(detailedPharmacies);
     
   } catch (error) {
     console.error('❌ [API] Error in /pending-pharmacies:', {
       error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
+      name: error.name,
+      code: error.code,
+      stack: error.stack
     });
-    
-    res.status(500).json({ 
+
+    return res.status(500).json({
       success: false,
-      message: 'Error fetching pending pharmacies',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      ...(process.env.NODE_ENV === 'development' && { 
+        error: error.message 
+      })
     });
   }
 });
