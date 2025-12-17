@@ -64,61 +64,72 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for API calls
+// Response interceptor with enhanced error handling
 api.interceptors.response.use(
   (response) => {
     // Log successful responses
-    console.log(`[API] ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`, {
-      data: response.data,
-    });
+    console.log(`✅ [API] ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
     return response;
   },
-  (error) => {
-    const { config, response } = error;
+  async (error) => {
+    const originalRequest = error.config;
     
     // Log error details
-    console.error('[API] Response error:', {
-      url: config?.url,
-      method: config?.method,
-      status: response?.status,
-      data: response?.data,
-      message: error.message,
+    console.error('❌ [API] Response error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: originalRequest?.url,
+      method: originalRequest?.method,
+      data: error.response?.data,
+      message: error.message
     });
 
-    // Handle 401 Unauthorized
-    if (response?.status === 401) {
-      const currentPath = window.location.pathname;
-      const isAuthRoute = ['/login', '/register', '/forgot-password'].some(route => 
-        currentPath.includes(route)
-      );
-      
-      // Don't redirect if we're already on an auth page
-      if (!isAuthRoute) {
-        console.log('[Auth] Unauthorized, redirecting to login');
-        
-        // Store current path for redirect after login
-        localStorage.setItem('redirectAfterLogin', currentPath);
-        
-        // Clear auth data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        
-        // Redirect to login after a small delay
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      }
+    // Handle network errors
+    if (!error.response) {
+      console.error('🌐 [API] Network error - No response from server');
+      return Promise.reject({
+        message: 'Network error. Please check your connection.',
+        isNetworkError: true
+      });
     }
-    
-    // Return a more detailed error
+
+    // Handle 401 Unauthorized
+    if (error.response.status === 401) {
+      const token = localStorage.getItem('token');
+      console.warn(`🔑 [API] Unauthorized access - Invalid or expired token (${token ? 'Token exists' : 'No token'})`);
+      
+      // Clear invalid token
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Redirect to login after a small delay
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+      
+      return Promise.reject({
+        message: 'Session expired. Please log in again.',
+        isAuthError: true
+      });
+    }
+
+    // Handle 5xx server errors
+    if (error.response.status >= 500) {
+      console.error('🔥 [API] Server error:', error.response.data);
+      return Promise.reject({
+        message: 'Server error. Please try again later.',
+        isServerError: true,
+        status: error.response.status,
+        data: error.response.data
+      });
+    }
+
+    // For other errors, pass through the error with enhanced details
     return Promise.reject({
-      message: error.message,
-      status: response?.status,
-      data: response?.data,
-      config: {
-        url: config?.url,
-        method: config?.method,
-      },
+      message: error.response?.data?.message || error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      isClientError: error.response?.status >= 400 && error.response?.status < 500
     });
   }
 );
