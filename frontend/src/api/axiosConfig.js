@@ -186,4 +186,4 @@ if (token) {
     : `Bearer ${token}`;
 }
 
-export default api;server.js fixed
+export default api;
