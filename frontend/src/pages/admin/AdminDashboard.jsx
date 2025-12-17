@@ -128,21 +128,15 @@ const AdminDashboard = () => {
 
   // Fetch pending pharmacy requests with retry logic
   const fetchPharmacyRequests = async (retryCount = 0) => {
-    const MAX_RETRIES = 2;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000; // 1 second
     
     try {
       console.log(`[${new Date().toISOString()}] Fetching pending pharmacy requests...`);
       setIsLoading(true);
       
-      // Clear any previous errors
-      setPharmacyRequests(prev => prev.length > 0 ? prev : []);
-      
       const response = await api.get('/auth/pending-pharmacies', {
-        timeout: 10000, // 10 second timeout
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+        timeout: 15000, // 15 second timeout
       });
       
       console.log('Received pharmacy requests:', response.data);
@@ -153,7 +147,6 @@ const AdminDashboard = () => {
       
       setPharmacyRequests(response.data);
       
-      // If we had to retry, show success message
       if (retryCount > 0) {
         toast.success('Pharmacy requests loaded successfully');
       }
@@ -162,35 +155,39 @@ const AdminDashboard = () => {
       console.error('Error fetching pharmacy requests:', error);
       
       // If we have retries left and it's a network error, retry
-      if (retryCount < MAX_RETRIES && 
-          (!error.response || error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK')) {
-        console.log(`Retrying... (${retryCount + 1}/${MAX_RETRIES})`);
-        // Wait 1 second before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return fetchPharmacyRequests(retryCount + 1);
-      }
-      
-      // Show appropriate error message
-      if (error.response) {
-        console.error('Response error:', error.response.data);
-        const errorMessage = error.response.data?.message || 'Failed to load pharmacy requests';
-        toast.error(`Error: ${errorMessage}`);
+      if (retryCount < MAX_RETRIES) {
+        const isNetworkError = !error.response || 
+                             error.code === 'ECONNABORTED' || 
+                             error.code === 'ERR_NETWORK';
         
-        // If it's an auth error, suggest re-login
-        if (error.response.status === 401) {
-          toast.error('Your session may have expired. Please log in again.', {
-            duration: 5000
-          });
+        if (isNetworkError) {
+          const delay = RETRY_DELAY * (retryCount + 1);
+          console.log(`Retrying in ${delay}ms... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchPharmacyRequests(retryCount + 1);
         }
-      } else if (error.code === 'ECONNABORTED') {
-        toast.error('Request timed out. Please check your connection and try again.');
-      } else {
-        toast.error('Failed to load pharmacy requests. Please try again.');
       }
       
-      // Set empty array to clear any previous data
-      setPharmacyRequests([]);
+      // Handle specific error cases
+      if (error.response) {
+        const { status, data } = error.response;
+        console.error('Response error:', data);
+        
+        if (status === 401) {
+          toast.error('Your session has expired. Please log in again.');
+          // Auth context will handle the redirect
+          return;
+        }
+        
+        const errorMessage = data?.message || 'Failed to load pharmacy requests';
+        toast.error(`Error: ${errorMessage}`);
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error('Request timed out. Please check your connection.');
+      } else {
+        toast.error('Failed to load pharmacy requests. Please try again later.');
+      }
       
+      setPharmacyRequests([]);
     } finally {
       setIsLoading(false);
     }

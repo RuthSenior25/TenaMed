@@ -5,8 +5,15 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   },
-  timeout: 15000, // 15 seconds timeout
+  timeout: 20000, // 20 seconds timeout
+  withCredentials: false, // Disable credentials for CORS
+  validateStatus: function (status) {
+    return status >= 200 && status < 500; // Resolve only if status code is less than 500
+  }
 });
 
 // Request interceptor for API calls

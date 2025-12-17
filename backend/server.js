@@ -10,21 +10,55 @@ const app = express();
 // CORS configuration
 const corsOptions = {
   origin: [
-    'https://tena-med.vercel.app', // Production frontend
-    'http://localhost:3000',       // Local development
-    'http://localhost:5173'        // Vite default port
+    'https://tena-med.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Cache-Control',
+    'Pragma',
+    'X-Requested-With'
+  ],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
-// Security middleware
+// Security middleware with CORS
 app.use(helmet());
 app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
+// Add headers before the routes are defined
+app.use(function (req, res, next) {
+  // Allow access from specific origins
+  const allowedOrigins = [
+    'https://tena-med.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
+  res.header('Access-Control-Allow-Credentials', true);
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Rate limiting
 const limiter = rateLimit({
