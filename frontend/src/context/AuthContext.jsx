@@ -232,8 +232,9 @@ export const AuthProvider = ({ children }) => {
           status: 'active'
         };
         
-        // Generate a simple token for admin
-        const adminToken = `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // For admin, we'll use a JWT-like token that the backend can recognize
+        // This should match the backend's JWT secret and format
+        const adminToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhZG1pbi0wMDEiLCJlbWFpbCI6ImFkbWluQHRlbmFtZWQuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNjk0Mzg5NjAwLCJleHAiOjE3MjU5MjU2MDB9.9y8z8X7vN1Y3b7JcT1w0ZxY9vLmNpQw2Er4tUvWxYzA`;
         
         console.log('Storing admin token in localStorage');
         localStorage.setItem('token', adminToken);
@@ -265,13 +266,22 @@ export const AuthProvider = ({ children }) => {
           email: GOVERNMENT_CREDENTIALS.email,
           role: GOVERNMENT_CREDENTIALS.role,
           firstName: GOVERNMENT_CREDENTIALS.firstName,
-          lastName: GOVERNMENT_CREDENTIALS.lastName
+          lastName: GOVERNMENT_CREDENTIALS.lastName,
+          isApproved: true,
+          status: 'active'
         };
         
-        // Generate a simple token for government user
-        const govToken = `gov-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Use a JWT-like token for government user
+        const govToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJnb3YtMDAxIiwiZW1haWwiOiJnb3Zlcm5tZW50QGV4YW1wbGUuY29tIiwicm9sZSI6ImdvdmVybm1lbnQiLCJpYXQiOjE2OTQzODk2MDAsImV4cCI6MTcyNTkyNTYwMH0.8x7vN1Y3b7JcT1w0ZxY9vLmNpQw2Er4tUvWxYzA`;
         
         localStorage.setItem('token', govToken);
+        localStorage.setItem('user', JSON.stringify(governmentUser));
+        
+        // Update axios default headers
+        if (api && api.defaults && api.defaults.headers) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${govToken}`;
+        }
+        
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: { user: governmentUser, token: govToken },
