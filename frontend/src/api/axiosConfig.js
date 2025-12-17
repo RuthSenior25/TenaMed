@@ -7,7 +7,6 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache'
-    // Removed 'Expires' header as it's causing CORS issues
   },
   timeout: 20000, // 20 seconds timeout
   withCredentials: false, // Disable credentials for CORS
@@ -19,6 +18,15 @@ const api = axios.create({
 // Request interceptor for API calls
 api.interceptors.request.use(
   (config) => {
+    // Remove any existing Expires header that might be added by browser/extensions
+    if (config.headers && config.headers['Expires']) {
+      delete config.headers['Expires'];
+    }
+    
+    // Ensure Cache-Control is set correctly
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    
     const token = localStorage.getItem('token');
     
     // Add auth token to request if it exists
