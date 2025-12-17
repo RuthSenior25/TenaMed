@@ -101,61 +101,22 @@ api.interceptors.response.use(
       });
     }
 
-    // Handle 401 Unauthorized (token expired)
-    if (response.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // If token refresh in progress, add to queue
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(api(originalRequest));
-          });
-        });
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+      console.warn('❌ [API] Unauthorized access - redirecting to login');
+      
+      // Clear auth data
+      auth.clearAuthData();
+      
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
       }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const refreshToken = auth.getRefreshToken();
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
-
-        // Try to refresh the token
-        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, {
-          refreshToken
-        });
-
-        // Update tokens
-        const { token: newToken, refreshToken: newRefreshToken } = data;
-        auth.setAuthData({
-          token: newToken,
-          refreshToken: newRefreshToken
-        });
-
-        // Update auth header and retry original request
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        
-        // Process queued requests
-        onRefreshed(newToken);
-        isRefreshing = false;
-        
-        return api(originalRequest);
-      } catch (refreshError) {
-        console.error('❌ [API] Token refresh failed:', refreshError);
-        // Clear auth data and redirect to login
-        auth.clearAuthData();
-        
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-        
-        return Promise.reject({
-          isAuthError: true,
-          message: 'Session expired. Please log in again.'
-        });
-      }
+      
+      return Promise.reject({
+        isAuthError: true,
+        message: 'Please log in to continue'
+      });
     }
 
     // Handle 403 Forbidden
