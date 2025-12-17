@@ -97,7 +97,10 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
       if (!token) {
+        console.log('No token found in localStorage');
         if (isMounted) {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -105,18 +108,43 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        // For admin token (starts with 'admin-'), create the admin user object
+        console.log('Token found in localStorage, verifying...');
+        
+        // For admin token (starts with 'admin-')
         if (token.startsWith('admin-')) {
-          const adminUser = {
-            _id: ADMIN_CREDENTIALS.id,
-            email: ADMIN_CREDENTIALS.email,
-            role: 'admin',
-            firstName: ADMIN_CREDENTIALS.firstName,
-            lastName: ADMIN_CREDENTIALS.lastName,
-            isAdmin: true,
-            isApproved: true,
-            status: 'active'
-          };
+          let adminUser;
+          
+          // Try to get user data from localStorage
+          if (storedUser) {
+            try {
+              adminUser = JSON.parse(storedUser);
+              console.log('Loaded admin user from localStorage');
+            } catch (e) {
+              console.error('Error parsing stored user data:', e);
+            }
+          }
+          
+          // If no valid user in localStorage, create a new one
+          if (!adminUser) {
+            console.log('Creating new admin user object');
+            adminUser = {
+              _id: ADMIN_CREDENTIALS.id,
+              email: ADMIN_CREDENTIALS.email,
+              role: 'admin',
+              firstName: ADMIN_CREDENTIALS.firstName,
+              lastName: ADMIN_CREDENTIALS.lastName,
+              isAdmin: true,
+              isApproved: true,
+              status: 'active'
+            };
+            // Save to localStorage for future use
+            localStorage.setItem('user', JSON.stringify(adminUser));
+          }
+          
+          // Update axios headers
+          if (api && api.defaults && api.defaults.headers) {
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          }
           
           if (isMounted) {
             dispatch({
@@ -126,6 +154,7 @@ export const AuthProvider = ({ children }) => {
                 token 
               },
             });
+            console.log('Admin authentication successful');
           }
           return;
         }
@@ -206,10 +235,21 @@ export const AuthProvider = ({ children }) => {
         // Generate a simple token for admin
         const adminToken = `admin-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
+        console.log('Storing admin token in localStorage');
         localStorage.setItem('token', adminToken);
+        localStorage.setItem('user', JSON.stringify(adminUser));
+        
+        // Update axios default headers
+        if (api && api.defaults && api.defaults.headers) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
+        }
+        
         dispatch({
           type: 'LOGIN_SUCCESS',
-          payload: { user: adminUser, token: adminToken },
+          payload: { 
+            user: adminUser, 
+            token: adminToken,
+          },
         });
         
         toast.success(`Welcome back, Administrator!`);
