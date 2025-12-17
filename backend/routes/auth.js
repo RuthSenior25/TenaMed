@@ -303,53 +303,84 @@ router.post('/logout', async (req, res) => {
 
 // Get pending pharmacy registrations (Admin only)
 router.get('/pending-pharmacies', authenticate, async (req, res) => {
+  console.log('🔍 [API] /pending-pharmacies - Request received');
+  console.log('🔑 Authenticated User:', {
+    id: req.user._id,
+    email: req.user.email,
+    role: req.user.role
+  });
+
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    console.warn('⚠️ Unauthorized access attempt - User is not an admin');
+    return res.status(403).json({ 
+      success: false,
+      message: 'Not authorized. Admin access required.' 
+    });
+  }
+
   try {
-    console.log('Received request to /pending-pharmacies');
+    console.log('🔍 [API] Building query for pending pharmacies...');
     
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      console.log('User is not an admin');
-      return res.status(403).json({ 
-        success: false,
-        message: 'Not authorized. Admin access required.' 
-      });
+    // Simplified query to find all pharmacy users first
+    const query = { role: 'pharmacy' };
+    
+    console.log('🔍 [API] Query:', JSON.stringify(query, null, 2));
+    
+    // First, get all pharmacy users with minimal fields
+    console.log('🔍 [API] Fetching pharmacy users...');
+    const startTime = Date.now();
+    
+    const pharmacyUsers = await User.find(query)
+      .select('_id email role isApproved status createdAt')
+      .lean();
+      
+    console.log(`✅ [API] Found ${pharmacyUsers.length} pharmacy users in ${Date.now() - startTime}ms`);
+    
+    // Filter in-memory for better control and debugging
+    const pendingPharmacies = pharmacyUsers.filter(user => {
+      const isPending = 
+        user.isApproved === false || 
+        (user.status && user.status.toLowerCase() === 'pending') ||
+        (!user.status && !user.isApproved);
+      
+      console.log(`User ${user._id} - isApproved: ${user.isApproved}, status: ${user.status} => ${isPending ? 'PENDING' : 'APPROVED/REJECTED'}`);
+      return isPending;
+    });
+    
+    console.log(`✅ [API] Found ${pendingPharmacies.length} pending pharmacies after filtering`);
+    
+    // If no pending pharmacies, return early
+    if (pendingPharmacies.length === 0) {
+      console.log('ℹ️  No pending pharmacies found');
+      return res.json([]);
     }
-
-    console.log('Admin verified, fetching pending pharmacies...');
-
-    // Find all pending pharmacy registrations
-    const query = {
-      role: 'pharmacy',
-      $or: [
-        { isApproved: false },
-        { isApproved: { $exists: false } },
-        { status: 'pending' },
-        { status: { $exists: false } }
-      ]
-    };
     
-    console.log('Querying database with:', JSON.stringify(query, null, 2));
+    // Get full details for pending pharmacies
+    console.log('🔍 [API] Fetching full details for pending pharmacies...');
+    const pendingIds = pendingPharmacies.map(p => p._id);
     
-    // Get all matching users
-    const pendingPharmacies = await User.find(query)
+    const detailedPharmacies = await User.find({ _id: { $in: pendingIds } })
       .select('-password')
       .populate('profile')
       .lean();
-
-    console.log(`Found ${pendingPharmacies.length} pending pharmacies`);
-
-    // Additional filtering to ensure we don't include approved pharmacies
-    const filteredPharmacies = pendingPharmacies.filter(pharmacy => {
-      const isApproved = pharmacy.isApproved === true || pharmacy.status === 'approved';
-      const isRejected = pharmacy.status === 'rejected';
-      return !isApproved && !isRejected;
-    });
-
-    console.log(`Found ${pendingPharmacies.length} pending pharmacies after filtering`);
-    res.json(pendingPharmacies);
+    
+    console.log(`✅ [API] Fetched details for ${detailedPharmacies.length} pharmacies`);
+    
+    res.json(detailedPharmacies);
+    
   } catch (error) {
-    console.error('Error fetching pending pharmacies:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('❌ [API] Error in /pending-pharmacies:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching pending pharmacies',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 
