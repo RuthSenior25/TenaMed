@@ -408,7 +408,6 @@ router.get(
     }
   }
 );
-});
 
 // Approve/Reject pharmacy
 router.patch('/pharmacy/:id/status', async (req, res) => {
