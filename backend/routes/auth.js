@@ -3,7 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Pharmacy = require('../models/Pharmacy');
-const { generateToken } = require('../middleware/auth');
+const { generateToken, authenticate } = require('../middleware/auth');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 
 // Register new user
@@ -302,57 +302,16 @@ router.post('/logout', async (req, res) => {
 });
 
 // Get pending pharmacy registrations (Admin only)
-router.get('/pending-pharmacies', async (req, res) => {
+router.get('/pending-pharmacies', authenticate, async (req, res) => {
   try {
     console.log('Received request to /pending-pharmacies');
     
-    // Verify token and get user
-    const authHeader = req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('No token provided');
-      return res.status(401).json({ 
-        success: false,
-        message: 'Access denied. No token provided.' 
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
-    if (!token) {
-      console.log('Invalid token format');
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid token format' 
-      });
-    }
-
-    // Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('Decoded token:', decoded);
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid or expired token' 
-      });
-    }
-
     // Check if user is admin
-    const adminUser = await User.findById(decoded.id).select('-password');
-    if (!adminUser) {
-      console.log('Admin user not found');
-      return res.status(404).json({ 
-        success: false,
-        message: 'User not found' 
-      });
-    }
-
-    if (adminUser.role !== 'admin') {
+    if (req.user.role !== 'admin') {
       console.log('User is not an admin');
       return res.status(403).json({ 
         success: false,
-        message: 'Not authorized' 
+        message: 'Not authorized. Admin access required.' 
       });
     }
 
