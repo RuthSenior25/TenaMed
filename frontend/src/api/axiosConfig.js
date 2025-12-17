@@ -6,8 +6,8 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0'
+    'Pragma': 'no-cache'
+    // Removed 'Expires' header as it's causing CORS issues
   },
   timeout: 20000, // 20 seconds timeout
   withCredentials: false, // Disable credentials for CORS
