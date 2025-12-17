@@ -7,6 +7,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 15000, // 15 seconds timeout
+  withCredentials: true, // Include cookies in requests (if using sessions)
 });
 
 // Request interceptor for API calls
@@ -14,23 +15,32 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     
+    // Add auth token to request if it exists
+    if (token) {
+      // For admin tokens (starting with 'admin-'), send as is
+      // For JWT tokens, add 'Bearer ' prefix
+      config.headers.Authorization = token.startsWith('admin-') 
+        ? token 
+        : `Bearer ${token}`;
+      
+      console.log(`[API] Added ${token.startsWith('admin-') ? 'admin' : 'JWT'} token to request`);
+    } else {
+      console.warn('[API] No auth token found in localStorage');
+    }
+    
     // Log request details (except sensitive data)
     console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
       params: config.params,
       headers: {
         ...config.headers,
         // Don't log the full Authorization header for security
-        Authorization: config.headers.Authorization ? 'Bearer [TOKEN]' : undefined,
+        Authorization: config.headers.Authorization 
+          ? config.headers.Authorization.startsWith('admin-') 
+            ? 'admin-...' 
+            : 'Bearer [TOKEN]' 
+          : undefined,
       },
     });
-
-    // Add auth token to request if it exists
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log('[API] Added auth token to request');
-    } else {
-      console.warn('[API] No auth token found in localStorage');
-    }
     
     return config;
   },
@@ -51,12 +61,11 @@ api.interceptors.response.use(
   },
   (error) => {
     const { config, response } = error;
-    const originalRequest = config;
     
     // Log error details
     console.error('[API] Response error:', {
-      url: originalRequest?.url,
-      method: originalRequest?.method,
+      url: config?.url,
+      method: config?.method,
       status: response?.status,
       data: response?.data,
       message: error.message,
@@ -72,6 +81,8 @@ api.interceptors.response.use(
       // Don't redirect if we're already on an auth page
       if (!isAuthRoute) {
         console.log('[Auth] Unauthorized, redirecting to login');
+        
+        // Store current path for redirect after login
         localStorage.setItem('redirectAfterLogin', currentPath);
         
         // Clear auth data
@@ -91,8 +102,8 @@ api.interceptors.response.use(
       status: response?.status,
       data: response?.data,
       config: {
-        url: originalRequest?.url,
-        method: originalRequest?.method,
+        url: config?.url,
+        method: config?.method,
       },
     });
   }
@@ -102,7 +113,10 @@ api.interceptors.response.use(
 api.setAuthToken = (token) => {
   if (token) {
     localStorage.setItem('token', token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    // For admin tokens, don't add 'Bearer ' prefix
+    api.defaults.headers.common['Authorization'] = token.startsWith('admin-') 
+      ? token 
+      : `Bearer ${token}`;
   } else {
     delete api.defaults.headers.common['Authorization'];
   }
