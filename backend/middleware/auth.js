@@ -16,18 +16,28 @@ const verifyToken = (token) => {
 // Authentication middleware
 const authenticate = async (req, res, next) => {
   try {
+    console.log('🔐 [AUTH] Starting authentication...');
+    
     const authHeader = req.header('Authorization');
     
     if (!authHeader) {
-      return res.status(401).json({ message: 'Access denied. No token provided.' });
+      console.warn('⚠️ [AUTH] No Authorization header found');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Access denied. No token provided.',
+        code: 'MISSING_TOKEN'
+      });
     }
 
     // Handle both 'Bearer token' and raw token formats
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+    
+    console.log(`🔍 [AUTH] Processing token: ${token.substring(0, 10)}...`);
     
     try {
       // Check for admin token (starts with 'admin-')
       if (token.startsWith('admin-')) {
+        console.log('👨‍💼 [AUTH] Admin token detected');
         // Simple admin token validation
         req.user = {
           _id: 'admin-001',
@@ -39,15 +49,42 @@ const authenticate = async (req, res, next) => {
           firstName: 'Admin',
           lastName: 'User'
         };
+        console.log('✅ [AUTH] Admin authentication successful');
         return next();
       }
 
+      console.log('🔑 [AUTH] Verifying JWT token...');
       // Regular JWT token validation
       const decoded = verifyToken(token);
-      const user = await User.findById(decoded.id).select('-password');
       
-      if (!user || !user.isActive) {
-        return res.status(401).json({ message: 'Invalid token or user not found.' });
+      if (!decoded || !decoded.id) {
+        console.warn('⚠️ [AUTH] Invalid token format - missing user ID');
+        return res.status(401).json({ 
+          success: false,
+          message: 'Invalid token format',
+          code: 'INVALID_TOKEN_FORMAT'
+        });
+      }
+      
+      console.log(`👤 [AUTH] Looking up user with ID: ${decoded.id}`);
+      const user = await User.findById(decoded.id).select('-password').lean();
+      
+      if (!user) {
+        console.warn(`⚠️ [AUTH] User not found for ID: ${decoded.id}`);
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not found',
+          code: 'USER_NOT_FOUND'
+        });
+      }
+      
+      if (!user.isActive) {
+        console.warn(`⚠️ [AUTH] User account is inactive: ${user.email}`);
+        return res.status(401).json({ 
+          success: false,
+          message: 'Account is inactive',
+          code: 'ACCOUNT_INACTIVE'
+        });
       }
 
       req.user = user;
