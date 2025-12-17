@@ -36,11 +36,16 @@ api.interceptors.request.use(
       return config;
     }
 
+    // Get token from auth utility
     const token = auth.getToken();
+    
+    // Add token to headers if it exists
     if (token) {
       config.headers.Authorization = token.startsWith('admin-') 
         ? token 
         : `Bearer ${token}`;
+    } else {
+      console.warn('[API] No auth token found for request to:', config.url);
     }
     
     // Log request details (except sensitive data)
