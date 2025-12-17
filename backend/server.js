@@ -8,12 +8,25 @@ require('dotenv').config();
 const app = express();
 
 // CORS configuration
+const allowedOrigins = [
+  'https://tena-med.vercel.app',
+  'https://tena-65tcayt50-ruths-projects-7791b467.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173'
+];
+
 const corsOptions = {
-  origin: [
-    'https://tena-med.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5173'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      console.warn(msg);
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
   allowedHeaders: [
     'Content-Type',
@@ -24,12 +37,14 @@ const corsOptions = {
     'Accept',
     'Origin',
     'Access-Control-Request-Headers',
-    'Access-Control-Request-Method'
+    'Access-Control-Request-Method',
+    'X-Requested-With',
+    'X-HTTP-Method-Override'
   ],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'Content-Disposition']
 };
 
 // Security middleware with CORS
@@ -38,38 +53,31 @@ app.use(helmet());
 // Apply CORS with options
 app.use(cors(corsOptions));
 
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
 // Add headers before the routes are defined
 app.use((req, res, next) => {
-  const allowedOrigins = [
-    'https://tena-med.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5173'
-  ];
-  
   const origin = req.headers.origin;
+  
+  // Set CORS headers
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Expose-Headers', 'Content-Disposition');
+  
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    // Preflight request. Reply with the necessary CORS headers
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Max-Age', '86400'); // 24 hours
     return res.status(200).end();
   }
   
-  // For non-preflight requests, just set the CORS headers
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
   next();
 });
-
-// Handle preflight requests for all routes
-app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
