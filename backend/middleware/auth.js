@@ -110,9 +110,6 @@ const authenticate = async (req, res, next) => {
       code: 'AUTH_ERROR',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
-  } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(500).json({ message: 'Server error during authentication.' });
   }
 };
 
