@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Pharmacy = require('../models/Pharmacy');
 const { generateToken, authenticate } = require('../middleware/auth');
+const { checkRole, roles } = require('../middleware/roles');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 
 // Health check endpoint
@@ -13,8 +14,36 @@ router.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    dbStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Get current user info
+router.get('/me', authenticate, (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated',
+        code: 'NOT_AUTHENTICATED'
+      });
+    }
+    
+    // Don't send sensitive data
+    const { password, ...userData } = req.user;
+    res.json({
+      success: true,
+      data: userData
+    });
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user data',
+      code: 'SERVER_ERROR'
+    });
+  }
 });
 
 // Register new user
@@ -313,54 +342,52 @@ router.post('/logout', async (req, res) => {
 });
 
 // Get pending pharmacy registrations (Admin only)
-router.get('/pending-pharmacies', authenticate, async (req, res) => {
-  console.log('🔵 [API] /pending-pharmacies - Request received');
-  
-  try {
-    // Verify admin role
-    if (req.user.role !== 'admin') {
-      console.warn('⚠️ Unauthorized access - User is not an admin');
-      return res.status(403).json({ 
-        success: false,
-        message: 'Admin access required' 
-      });
-    }
-
-    console.log('🔵 [API] User authenticated as admin, querying DB...');
-    
-    // Add query timeout and limit
-    const query = { 
-      role: 'pharmacy',
-      $or: [
-        { isApproved: false },
-        { isApproved: { $exists: false } },
-        { status: 'pending' }
-      ]
-    };
-
-    console.log('🔵 [API] Executing DB query...');
-    const startTime = Date.now();
+router.get(
+  '/pending-pharmacies',
+  authenticate,
+  checkRole(roles.ADMIN),
+  async (req, res) => {
+    console.log('🔵 [API] /pending-pharmacies - Request received');
     
     try {
+      console.log('🔍 [API] Querying pending pharmacies...');
+      const startTime = Date.now();
+      
+      const query = { 
+        role: roles.PHARMACY,
+        $or: [
+          { isApproved: false },
+          { isApproved: { $exists: false } },
+          { status: 'pending' }
+        ]
+      };
+
       const pharmacies = await User.find(query)
         .select('-password')
         .lean()
         .maxTimeMS(5000) // 5 second timeout
         .limit(100); // Limit results
 
-      console.log(`✅ [API] Query completed in ${Date.now() - startTime}ms`);
-      console.log(`✅ [API] Found ${pharmacies.length} pharmacies`);
+      console.log(`✅ [API] Found ${pharmacies.length} pharmacies in ${Date.now() - startTime}ms`);
 
-      return res.json(pharmacies);
-    } catch (dbError) {
-      console.error('❌ [API] Database error:', {
-        error: dbError.message,
-        code: dbError.code,
-        name: dbError.name
+      return res.json({
+        success: true,
+        data: pharmacies,
+        meta: {
+          count: pharmacies.length,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ [API] Error in /pending-pharmacies:', {
+        error: error.message,
+        code: error.code,
+        name: error.name
       });
 
-      // Handle timeout specifically
-      if (dbError.name === 'MongoError' && dbError.code === 50) {
+      // Handle database errors
+      if (error.name === 'MongoError' && error.code === 50) {
         return res.status(504).json({
           success: false,
           message: 'Database operation timed out',
@@ -368,26 +395,19 @@ router.get('/pending-pharmacies', authenticate, async (req, res) => {
         });
       }
 
-      throw dbError; // Re-throw to be caught by outer catch
+      // For other errors
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch pending pharmacies',
+        code: 'SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && {
+          error: error.message,
+          stack: error.stack
+        })
+      });
     }
-    
-  } catch (error) {
-    console.error('❌ [API] Error in /pending-pharmacies:', {
-      error: error.message,
-      name: error.name,
-      code: error.code,
-      stack: error.stack
-    });
-
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      code: 'INTERNAL_ERROR',
-      ...(process.env.NODE_ENV === 'development' && { 
-        error: error.message 
-      })
-    });
   }
+);
 });
 
 // Approve/Reject pharmacy

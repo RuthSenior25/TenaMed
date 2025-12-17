@@ -15,77 +15,102 @@ const verifyToken = (token) => {
 
 // Authentication middleware
 const authenticate = async (req, res, next) => {
+  console.log('🔐 [AUTH] Starting authentication...');
+  
+  const authHeader = req.header('Authorization');
+  
+  if (!authHeader) {
+    console.warn('⚠️ [AUTH] No Authorization header found');
+    return res.status(401).json({ 
+      success: false,
+      message: 'Access denied. No token provided.',
+      code: 'MISSING_TOKEN'
+    });
+  }
+
+  // Handle both 'Bearer token' and raw token formats
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+  
+  console.log(`🔍 [AUTH] Processing token: ${token.substring(0, 10)}...`);
+  
   try {
-    console.log('🔐 [AUTH] Starting authentication...');
-    
-    const authHeader = req.header('Authorization');
-    
-    if (!authHeader) {
-      console.warn('⚠️ [AUTH] No Authorization header found');
-      return res.status(401).json({ 
-        success: false,
-        message: 'Access denied. No token provided.',
-        code: 'MISSING_TOKEN'
-      });
+    // Check for admin token (starts with 'admin-')
+    if (token.startsWith('admin-')) {
+      console.log('👨‍💼 [AUTH] Admin token detected');
+      // Simple admin token validation
+      req.user = {
+        _id: 'admin-001',
+        id: 'admin-001',
+        email: 'admin@tenamed.com',
+        role: 'admin',
+        isAdmin: true,
+        isActive: true,
+        firstName: 'Admin',
+        lastName: 'User'
+      };
+      console.log('✅ [AUTH] Admin authentication successful');
+      return next();
     }
 
-    // Handle both 'Bearer token' and raw token formats
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : authHeader.trim();
+    console.log('🔑 [AUTH] Verifying JWT token...');
+    // Regular JWT token validation
+    const decoded = verifyToken(token);
     
-    console.log(`🔍 [AUTH] Processing token: ${token.substring(0, 10)}...`);
+    if (!decoded || !decoded.id) {
+      console.warn('⚠️ [AUTH] Invalid token format - missing user ID');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Invalid token format',
+        code: 'INVALID_TOKEN_FORMAT'
+      });
+    }
     
-    try {
-      // Check for admin token (starts with 'admin-')
-      if (token.startsWith('admin-')) {
-        console.log('👨‍💼 [AUTH] Admin token detected');
-        // Simple admin token validation
-        req.user = {
-          _id: 'admin-001',
-          id: 'admin-001',
-          email: 'admin@tenamed.com',
-          role: 'admin',
-          isAdmin: true,
-          isActive: true,
-          firstName: 'Admin',
-          lastName: 'User'
-        };
-        console.log('✅ [AUTH] Admin authentication successful');
-        return next();
-      }
-
-      console.log('🔑 [AUTH] Verifying JWT token...');
-      // Regular JWT token validation
-      const decoded = verifyToken(token);
-      
-      if (!decoded || !decoded.id) {
-        console.warn('⚠️ [AUTH] Invalid token format - missing user ID');
-        return res.status(401).json({ 
-          success: false,
-          message: 'Invalid token format',
-          code: 'INVALID_TOKEN_FORMAT'
-        });
-      }
-      
-      console.log(`👤 [AUTH] Looking up user with ID: ${decoded.id}`);
-      const user = await User.findById(decoded.id).select('-password').lean();
-      
-      if (!user) {
-        console.warn(`⚠️ [AUTH] User not found for ID: ${decoded.id}`);
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not found',
-          code: 'USER_NOT_FOUND'
-        });
-      }
-      
-      if (!user.isActive) {
-        console.warn(`⚠️ [AUTH] User account is inactive: ${user.email}`);
-        return res.status(401).json({ 
-          success: false,
-          message: 'Account is inactive',
-          code: 'ACCOUNT_INACTIVE'
-        });
-      }
+    console.log(`👤 [AUTH] Looking up user with ID: ${decoded.id}`);
+    const user = await User.findById(decoded.id).select('-password').lean();
+    
+    if (!user) {
+      console.warn(`⚠️ [AUTH] User not found for ID: ${decoded.id}`);
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+    
+    if (!user.isActive) {
+      console.warn(`⚠️ [AUTH] User account is inactive: ${user.email}`);
+      return res.status(401).json({ 
+        success: false,
+        message: 'Account is inactive',
+        code: 'ACCOUNT_INACTIVE'
+      });
+    }
+    
+    // Add user to request
+    req.user = user;
+    console.log(`✅ [AUTH] Authentication successful for user: ${user.email} (${user.role})`);
+    next();
+  } catch (error) {
+    console.error('❌ [AUTH] Authentication error:', error);
+    
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token',
+        code: 'INVALID_TOKEN',
+        error: error.message
+      });
+    }
+    
+    // For other unexpected errors
+    console.error('🔴 [AUTH] Unexpected authentication error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication failed',
+      code: 'AUTH_ERROR',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 
       req.user = user;
       next();
