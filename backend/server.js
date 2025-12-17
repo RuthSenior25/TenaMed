@@ -20,23 +20,26 @@ const corsOptions = {
     'Authorization',
     'Cache-Control',
     'Pragma',
-    'X-Requested-With'
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Headers',
+    'Access-Control-Request-Method'
   ],
   credentials: true,
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
 };
 
 // Security middleware with CORS
 app.use(helmet());
+
+// Apply CORS with options
 app.use(cors(corsOptions));
 
-// Handle preflight requests
-app.options('*', cors(corsOptions));
-
 // Add headers before the routes are defined
-app.use(function (req, res, next) {
-  // Allow access from specific origins
+app.use((req, res, next) => {
   const allowedOrigins = [
     'https://tena-med.vercel.app',
     'http://localhost:3000',
@@ -48,17 +51,25 @@ app.use(function (req, res, next) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
-  res.header('Access-Control-Allow-Credentials', true);
-  
-  // Handle preflight
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    // Preflight request. Reply with the necessary CORS headers
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
     return res.status(200).end();
   }
   
+  // For non-preflight requests, just set the CORS headers
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   next();
 });
+
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
