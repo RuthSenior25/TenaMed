@@ -1,45 +1,46 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import auth from '../utils/auth';
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api',
+  timeout: 15000, // 15 seconds
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache'
-  },
-  timeout: 20000, // 20 seconds timeout
-  withCredentials: false, // Disable credentials for CORS
-  validateStatus: function (status) {
-    return status >= 200 && status < 500; // Resolve only if status code is less than 500
   }
 });
 
-// Request interceptor for API calls
+// Flag to prevent multiple token refresh attempts
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+// Function to add subscribers to the refresh queue
+const subscribeTokenRefresh = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+// Function to retry failed requests after token refresh
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+};
+
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Remove any existing Expires header that might be added by browser/extensions
-    if (config.headers && config.headers['Expires']) {
-      delete config.headers['Expires'];
+    // Don't add auth header for login/refresh token requests
+    if (config.url.includes('/auth/login') || config.url.includes('/auth/refresh')) {
+      return config;
     }
-    
-    // Ensure Cache-Control is set correctly
-    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-    config.headers['Pragma'] = 'no-cache';
-    
-    const token = localStorage.getItem('token');
-    
-    // Add auth token to request if it exists
+
+    const token = auth.getToken();
     if (token) {
-      // For admin tokens (starting with 'admin-'), send as is
-      // For JWT tokens, add 'Bearer ' prefix
       config.headers.Authorization = token.startsWith('admin-') 
         ? token 
         : `Bearer ${token}`;
-      
-      console.log(`[API] Added ${token.startsWith('admin-') ? 'admin' : 'JWT'} token to request`);
-    } else {
-      console.warn('[API] No auth token found in localStorage');
     }
     
     // Log request details (except sensitive data)
@@ -64,7 +65,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor with enhanced error handling
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
     // Log successful responses
@@ -73,84 +74,150 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    const { response } = error;
     
     // Log error details
     console.error('❌ [API] Response error:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
+      status: response?.status,
+      statusText: response?.statusText,
       url: originalRequest?.url,
       method: originalRequest?.method,
-      data: error.response?.data,
+      data: response?.data,
       message: error.message
     });
 
     // Handle network errors
-    if (!error.response) {
+    if (!response) {
       console.error('🌐 [API] Network error - No response from server');
+      toast.error('Network error. Please check your connection.');
       return Promise.reject({
-        message: 'Network error. Please check your connection.',
-        isNetworkError: true
+        isNetworkError: true,
+        message: 'Network error. Please check your connection.'
       });
     }
 
-    // Handle 401 Unauthorized
-    if (error.response.status === 401) {
-      const token = localStorage.getItem('token');
-      console.warn(`🔑 [API] Unauthorized access - Invalid or expired token (${token ? 'Token exists' : 'No token'})`);
-      
-      // Clear invalid token
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Redirect to login after a small delay
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
-      
+    // Handle 401 Unauthorized (token expired)
+    if (response.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If token refresh in progress, add to queue
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshToken = auth.getRefreshToken();
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        // Try to refresh the token
+        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, {
+          refreshToken
+        });
+
+        // Update tokens
+        const { token: newToken, refreshToken: newRefreshToken } = data;
+        auth.setAuthData({
+          token: newToken,
+          refreshToken: newRefreshToken
+        });
+
+        // Update auth header and retry original request
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        
+        // Process queued requests
+        onRefreshed(newToken);
+        isRefreshing = false;
+        
+        return api(originalRequest);
+      } catch (refreshError) {
+        console.error('❌ [API] Token refresh failed:', refreshError);
+        // Clear auth data and redirect to login
+        auth.clearAuthData();
+        
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+        
+        return Promise.reject({
+          isAuthError: true,
+          message: 'Session expired. Please log in again.'
+        });
+      }
+    }
+
+    // Handle 403 Forbidden
+    if (response.status === 403) {
+      const errorMessage = response.data?.message || 'You do not have permission to perform this action';
+      toast.error(errorMessage);
       return Promise.reject({
-        message: 'Session expired. Please log in again.',
-        isAuthError: true
+        isForbidden: true,
+        message: errorMessage
       });
     }
 
     // Handle 5xx server errors
-    if (error.response.status >= 500) {
-      console.error('🔥 [API] Server error:', error.response.data);
+    if (response.status >= 500) {
+      console.error('🔥 [API] Server error:', response.data);
+      toast.error('Server error. Please try again later.');
       return Promise.reject({
-        message: 'Server error. Please try again later.',
         isServerError: true,
-        status: error.response.status,
-        data: error.response.data
+        message: 'Server error. Please try again later.',
+        status: response.status,
+        data: response.data
       });
     }
 
-    // For other errors, pass through the error with enhanced details
+    // Handle other client errors (4xx)
+    if (response.status >= 400) {
+      const errorMessage = response.data?.message || 'An error occurred';
+      if (errorMessage && !originalRequest._retry) {
+        toast.error(errorMessage);
+      }
+    }
+
+    // Pass through the error with enhanced details
     return Promise.reject({
-      message: error.response?.data?.message || error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      isClientError: error.response?.status >= 400 && error.response?.status < 500
+      message: response.data?.message || error.message,
+      status: response.status,
+      data: response.data,
+      isClientError: response.status >= 400 && response.status < 500
     });
   }
 );
 
-// Helper function to set auth token
-api.setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('token', token);
-    // For admin tokens, don't add 'Bearer ' prefix
-    api.defaults.headers.common['Authorization'] = token.startsWith('admin-') 
-      ? token 
-      : `Bearer ${token}`;
+// Helper function to set auth tokens
+api.setAuthTokens = (tokens) => {
+  if (tokens.token) {
+    auth.setAuthData({
+      token: tokens.token,
+      refreshToken: tokens.refreshToken,
+      user: tokens.user
+    });
+    
+    // Update axios default headers
+    api.defaults.headers.common['Authorization'] = tokens.token.startsWith('admin-') 
+      ? tokens.token 
+      : `Bearer ${tokens.token}`;
   } else {
+    auth.clearAuthData();
     delete api.defaults.headers.common['Authorization'];
   }
 };
 
 // Initialize auth token if it exists
-const token = localStorage.getItem('token');
+const token = auth.getToken();
 if (token) {
-  api.setAuthToken(token);
+  api.defaults.headers.common['Authorization'] = token.startsWith('admin-') 
+    ? token 
+    : `Bearer ${token}`;
 }
 
 export default api;
