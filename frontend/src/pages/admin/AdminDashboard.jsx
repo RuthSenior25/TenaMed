@@ -153,7 +153,8 @@ const AdminDashboard = () => {
       const response = await api.get('/auth/pending-pharmacies', {
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Authorization': localStorage.getItem('token') || ''
         },
         signal: abortControllerRef.current.signal,
         suppressToast: true
