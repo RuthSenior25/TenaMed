@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 // Hardcoded credentials
 const ADMIN_CREDENTIALS = {
   email: 'admin@tenamed.com',
-  password: 'Admin@TenaMed2024!',
+  password: 'TenaMed2024!',
   role: 'admin',
   firstName: 'Admin',
   lastName: 'User',
