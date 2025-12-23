@@ -16,6 +16,7 @@ const api = axios.create({
 // Flag to prevent multiple token refresh attempts
 let isRefreshing = false;
 let refreshSubscribers = [];
+let lastNetworkToastAt = 0;
 
 // Function to add subscribers to the refresh queue
 const subscribeTokenRefresh = (cb) => {
@@ -94,7 +95,15 @@ api.interceptors.response.use(
     // Handle network errors
     if (!response) {
       console.error('🌐 [API] Network error - No response from server');
-      toast.error('Network error. Please check your connection.');
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        return Promise.reject(error);
+      }
+      const suppressToast = !!originalRequest?.suppressToast;
+      const now = Date.now();
+      if (!suppressToast && now - lastNetworkToastAt > 3000) {
+        lastNetworkToastAt = now;
+        toast.error('Network error. Please check your connection.');
+      }
       return Promise.reject({
         isNetworkError: true,
         message: 'Network error. Please check your connection.'

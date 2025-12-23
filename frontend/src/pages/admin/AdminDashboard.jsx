@@ -127,6 +127,8 @@ const AdminDashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
   const refreshInterval = useRef(null);
+  const isActiveRef = useRef(true);
+  const abortControllerRef = useRef(null);
   const user = auth.getCurrentUser();
 
   // Fetch pending pharmacy requests with retry logic
@@ -135,16 +137,23 @@ const AdminDashboard = () => {
     const RETRY_DELAY = 1000; // 1 second
     
     try {
+      if (!isActiveRef.current) return;
       console.log(`[${new Date().toISOString()}] Fetching pending pharmacy requests...`);
       setError(null);
       setIsLoading(true);
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
       
       const response = await api.get('/auth/pending-pharmacies', {
-        timeout: 15000, // 15 second timeout
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
-        }
+        },
+        signal: abortControllerRef.current.signal,
+        suppressToast: true
       });
       
       console.log('Received pharmacy requests:', response.data);
@@ -153,6 +162,7 @@ const AdminDashboard = () => {
         throw new Error('Invalid response format from server');
       }
       
+      if (!isActiveRef.current) return;
       setPharmacyRequests(response.data.data);
       setLastUpdated(new Date());
       
@@ -161,6 +171,12 @@ const AdminDashboard = () => {
       }
       
     } catch (error) {
+      if (!isActiveRef.current) return;
+
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        return;
+      }
+
       console.error('Error fetching pharmacy requests:', error);
       
       // If we have retries left and it's a network error, retry
@@ -173,6 +189,7 @@ const AdminDashboard = () => {
           const delay = RETRY_DELAY * (retryCount + 1);
           console.log(`Retrying in ${delay}ms... (${retryCount + 1}/${MAX_RETRIES})`);
           await new Promise(resolve => setTimeout(resolve, delay));
+          if (!isActiveRef.current) return;
           return fetchPharmacyRequests(retryCount + 1);
         }
       }
@@ -211,6 +228,7 @@ const AdminDashboard = () => {
       
       setPharmacyRequests([]);
     } finally {
+      if (!isActiveRef.current) return;
       setIsLoading(false);
     }
   }, [navigate]);
@@ -260,13 +278,25 @@ const AdminDashboard = () => {
     
     // Clean up interval on unmount
     return () => {
+      isActiveRef.current = false;
       if (refreshInterval.current) {
         clearInterval(refreshInterval.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, [fetchPharmacyRequests]);
 
   const handleLogout = () => {
+    isActiveRef.current = false;
+    if (refreshInterval.current) {
+      clearInterval(refreshInterval.current);
+      refreshInterval.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     auth.clearAuthData();
     navigate('/login');
   };
