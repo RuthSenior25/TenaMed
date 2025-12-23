@@ -218,6 +218,15 @@ export const AuthProvider = ({ children }) => {
       
       // Check for admin login
       console.log('Login attempt:', credentials.email);
+      console.log('Comparing with admin credentials:', {
+        inputEmail: credentials.email,
+        inputPassword: credentials.password,
+        storedEmail: ADMIN_CREDENTIALS.email,
+        storedPassword: ADMIN_CREDENTIALS.password,
+        emailMatch: credentials.email === ADMIN_CREDENTIALS.email,
+        passwordMatch: credentials.password === ADMIN_CREDENTIALS.password
+      });
+      
       if (credentials.email === ADMIN_CREDENTIALS.email && 
           credentials.password === ADMIN_CREDENTIALS.password) {
         
