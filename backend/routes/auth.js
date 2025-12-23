@@ -3,8 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { authenticate, authorize } = require('../middleware/auth');
 const Pharmacy = require('../models/Pharmacy');
-const { generateToken, authenticate } = require('../middleware/auth');
 const { checkRole, roles } = require('../middleware/roles');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 
@@ -410,23 +410,10 @@ router.get(
 );
 
 // Approve/Reject pharmacy
-router.patch('/pharmacy/:id/status', async (req, res) => {
+router.patch('/pharmacy/:id/status', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
-    
-    // Verify admin
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const adminUser = await User.findById(decoded.id);
-    
-    if (!adminUser || adminUser.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
 
     // Find and update pharmacy
     const pharmacy = await User.findById(id).populate('profile');
