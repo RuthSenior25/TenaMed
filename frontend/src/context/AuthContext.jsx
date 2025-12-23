@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import { authAPI } from '../api/auth';
+import api from '../api/axiosConfig';
 import toast from 'react-hot-toast';
 
 // Hardcoded credentials
@@ -142,9 +143,7 @@ export const AuthProvider = ({ children }) => {
           }
           
           // Update axios headers
-          if (api && api.defaults && api.defaults.headers) {
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          }
+          api.defaults.headers.common['Authorization'] = token;
           
           if (isMounted) {
             dispatch({
@@ -234,16 +233,14 @@ export const AuthProvider = ({ children }) => {
         
         // For admin, we'll use a JWT-like token that the backend can recognize
         // This should match the backend's JWT secret and format
-        const adminToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhZG1pbi0wMDEiLCJlbWFpbCI6ImFkbWluQHRlbmFtZWQuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNjk0Mzg5NjAwLCJleHAiOjE3MjU5MjU2MDB9.9y8z8X7vN1Y3b7JcT1w0ZxY9vLmNpQw2Er4tUvWxYzA`;
+        const adminToken = 'admin-001';
         
         console.log('Storing admin token in localStorage');
         localStorage.setItem('token', adminToken);
         localStorage.setItem('user', JSON.stringify(adminUser));
         
         // Update axios default headers
-        if (api && api.defaults && api.defaults.headers) {
-          api.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
-        }
+        api.defaults.headers.common['Authorization'] = adminToken;
         
         dispatch({
           type: 'LOGIN_SUCCESS',
