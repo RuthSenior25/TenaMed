@@ -466,7 +466,12 @@ export const AuthProvider = ({ children }) => {
 
   const logout = (message = 'Logged out successfully') => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('refreshToken');
     if (logoutTimer) clearTimeout(logoutTimer);
+    if (authAPI?.defaults?.headers?.common) {
+      delete authAPI.defaults.headers.common['Authorization'];
+    }
     dispatch({ type: 'LOGOUT' });
     if (message) {
       toast.success(message);

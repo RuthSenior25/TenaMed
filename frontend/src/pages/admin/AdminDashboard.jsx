@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../../api/axiosConfig';
 import auth from '../../utils/auth';
+import { useAuth } from '../../context/AuthContext';
 
 // Rejection Modal Component
 const RejectionModal = ({ isOpen, onClose, onConfirm, pharmacy, isLoading }) => {
@@ -121,11 +122,13 @@ const PharmacyRequestItem = ({ pharmacy, onApprove, onReject }) => {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [pharmacyRequests, setPharmacyRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
+
   const refreshInterval = useRef(null);
   const isActiveRef = useRef(true);
   const abortControllerRef = useRef(null);
@@ -298,7 +301,8 @@ const AdminDashboard = () => {
       abortControllerRef.current.abort();
     }
     auth.clearAuthData();
-    navigate('/login');
+    logout(null);
+    navigate('/login', { replace: true });
   };
   
   const handleRefresh = () => {

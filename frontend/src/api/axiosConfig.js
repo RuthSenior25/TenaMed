@@ -118,8 +118,8 @@ api.interceptors.response.use(
       auth.clearAuthData();
       
       // Only redirect if not already on login page
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      if (window.location.hash !== '#/login') {
+        window.location.hash = '#/login';
       }
       
       return Promise.reject({
