@@ -58,6 +58,14 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Database connection
 console.log('🔌 Connecting to MongoDB...');
 mongoose.connect(process.env.MONGODB_URI, {

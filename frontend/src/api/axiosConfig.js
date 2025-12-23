@@ -5,7 +5,7 @@ import auth from '../utils/auth';
 // Create axios instance with default config
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api',
-  timeout: 15000, // 15 seconds
+  timeout: 60000, // 60 seconds
   headers: {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache, no-store, must-revalidate',
