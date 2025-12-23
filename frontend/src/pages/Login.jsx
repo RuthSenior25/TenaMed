@@ -26,19 +26,10 @@ const Login = () => {
   useEffect(() => {
     // Clear any existing errors when component mounts
     clearErrors();
-    // Clear any cached user data that might cause redirect loops
-    if (localStorage.getItem('user')) {
-      try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user.role === 'pharmacy' || (!user.isAdmin && user.role !== 'admin')) {
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-        }
-      } catch (e) {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
-    }
+    // Clear ALL cached user data that might cause redirect loops
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
   }, []);
 
   const onSubmit = async (data) => {
