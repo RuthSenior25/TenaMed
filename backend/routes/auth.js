@@ -415,27 +415,25 @@ router.patch('/pharmacy/:id/status', authenticate, authorize('admin'), async (re
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
 
+    // Validate status
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Must be approved or rejected.' });
+    }
+
     // Find and update pharmacy
     const pharmacy = await User.findById(id).populate('profile');
     if (!pharmacy || pharmacy.role !== 'pharmacy') {
       return res.status(404).json({ message: 'Pharmacy not found' });
     }
 
+    // Update approval status
     pharmacy.isApproved = status === 'approved';
+    pharmacy.status = status;
+    
     if (status === 'rejected' && rejectionReason) {
       pharmacy.rejectionReason = rejectionReason;
     } else if (status === 'approved') {
-      // Create pharmacy profile if approved
-      const newPharmacy = new Pharmacy({
-        name: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
-        owner: pharmacy._id,
-        contact: {
-          email: pharmacy.email,
-          phone: pharmacy.profile?.phone || ''
-        },
-        address: pharmacy.profile?.address || {}
-      });
-      await newPharmacy.save();
+      pharmacy.rejectionReason = undefined; // Clear rejection reason if approved
     }
 
     await pharmacy.save();
