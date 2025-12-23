@@ -136,8 +136,8 @@ const AdminDashboard = () => {
 
   // Fetch pending pharmacy requests with retry logic
   const fetchPharmacyRequests = useCallback(async (retryCount = 0) => {
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 1000; // 1 second
+    const MAX_RETRIES = 1;
+    const RETRY_DELAY = 2000; // 2 seconds
     
     try {
       if (!isActiveRef.current) return;
