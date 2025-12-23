@@ -40,6 +40,12 @@ api.interceptors.request.use(
     // Get token from auth utility
     const token = auth.getToken();
     
+    console.log('[API] Token check:', {
+      hasToken: !!token,
+      tokenValue: token,
+      localStorageToken: localStorage.getItem('token')
+    });
+    
     // Add token to headers if it exists
     if (token) {
       config.headers.Authorization = token.startsWith('admin-') 

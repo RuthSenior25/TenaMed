@@ -217,8 +217,11 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: 'LOGIN_START' });
       
       // Check for admin login
+      console.log('Login attempt:', credentials.email);
       if (credentials.email === ADMIN_CREDENTIALS.email && 
           credentials.password === ADMIN_CREDENTIALS.password) {
+        
+        console.log('Admin login detected - using hardcoded credentials');
         
         const adminUser = {
           _id: ADMIN_CREDENTIALS.id,
@@ -238,6 +241,11 @@ export const AuthProvider = ({ children }) => {
         console.log('Storing admin token in localStorage');
         localStorage.setItem('token', adminToken);
         localStorage.setItem('user', JSON.stringify(adminUser));
+        
+        console.log('Token stored. Verifying:', {
+          tokenInStorage: localStorage.getItem('token'),
+          userInStorage: localStorage.getItem('user')
+        });
         
         // Update axios default headers
         api.defaults.headers.common['Authorization'] = adminToken;
