@@ -13,7 +13,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = '/dashboard';
 
   const {
     register,
