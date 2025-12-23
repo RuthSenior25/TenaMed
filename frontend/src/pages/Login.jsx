@@ -26,7 +26,25 @@ const Login = () => {
   useEffect(() => {
     // Clear any existing errors when component mounts
     clearErrors();
-    // Clear ALL cached user data that might cause redirect loops
+    // Only clear cached data if user is not already logged in as admin
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      try {
+        const parsedUser = JSON.parse(user);
+        // Don't clear if user is admin with valid admin token
+        if (parsedUser.role === 'admin' && token.startsWith('admin-')) {
+          return;
+        }
+      } catch (e) {
+        // Invalid user data, clear everything
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        return;
+      }
+    }
+    // Clear only non-admin cached data
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
