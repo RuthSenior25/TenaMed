@@ -449,6 +449,8 @@ const PatientDashboard = () => {
   const { logout } = useAuth();
   const { priceBoard } = useSupplyChain();
   const [activePanel, setActivePanel] = useState('pharmacies');
+  const [approvedPharmacies, setApprovedPharmacies] = useState([]);
+  const [isLoadingPharmacies, setIsLoadingPharmacies] = useState(true);
   const [prescriptions, setPrescriptions] = useState([
     { id: 'RX-1023', drug: 'Amoxicillin 500mg', dosage: '2x / day', frequency: 'Morning & Night', refills: 1 },
     { id: 'RX-0991', drug: 'Metformin 850mg', dosage: '1x / day', frequency: 'Evening', refills: 3 },
@@ -495,6 +497,23 @@ const PatientDashboard = () => {
     { label: 'Deliveries Today', value: deliveries.filter((d) => d.status !== 'Delivered').length },
     { label: 'Nearby Pharmacies', value: 'Find Now', isAction: true, action: () => setActivePanel('pharmacies') },
   ];
+
+  useEffect(() => {
+    const fetchApprovedPharmacies = async () => {
+      try {
+        setIsLoadingPharmacies(true);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`);
+        const data = await response.json();
+        setApprovedPharmacies(data.pharmacies || []);
+      } catch (error) {
+        console.error('Error fetching approved pharmacies:', error);
+      } finally {
+        setIsLoadingPharmacies(false);
+      }
+    };
+
+    fetchApprovedPharmacies();
+  }, []);
 
   const recordAlert = (message) => setAlerts((prev) => [message, ...prev].slice(0, 4));
 
@@ -614,46 +633,90 @@ const PatientDashboard = () => {
     switch (activePanel) {
       case 'pharmacies':
         return <PharmacyLocator />;
-      case 'prescriptions':
+      case 'approved-pharmacies':
         return (
           <div>
-            <form onSubmit={handlePrescriptionSubmit} style={{ marginBottom: '18px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-                <input
-                  style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-                  placeholder="Medication name"
-                  value={prescriptionForm.drug}
-                  onChange={(e) => setPrescriptionForm((prev) => ({ ...prev, drug: e.target.value }))}
-                />
-                <input
-                  style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-                  placeholder="Dosage (e.g. 1 tablet)"
-                  value={prescriptionForm.dosage}
-                  onChange={(e) => setPrescriptionForm((prev) => ({ ...prev, dosage: e.target.value }))}
-                />
-                <input
-                  style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-                  placeholder="Frequency"
-                  value={prescriptionForm.frequency}
-                  onChange={(e) => setPrescriptionForm((prev) => ({ ...prev, frequency: e.target.value }))}
-                />
+            <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#2d3748', marginBottom: '16px' }}>
+              Approved Pharmacies for Ordering
+            </h3>
+            {isLoadingPharmacies ? (
+              <div style={{ textAlign: 'center', padding: '32px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  border: '3px solid #e2e8f0',
+                  borderTop: '3px solid #3b82f6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto 16px'
+                }}></div>
+                <p style={{ color: '#718096' }}>Loading approved pharmacies...</p>
               </div>
-              <button type="submit" style={{ ...buttonBaseStyle, background: '#3182ce' }}>Save Prescription</button>
-            </form>
-            {prescriptions.map((rx) => (
-              <div key={rx.id} style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '12px' }}>
-                <div style={{ fontWeight: 600, fontSize: '16px' }}>{rx.drug}</div>
-                <p style={{ margin: '4px 0', color: '#4a5568' }}>Dosage: {rx.dosage}</p>
-                <p style={{ margin: '4px 0', color: '#4a5568' }}>Frequency: {rx.frequency || '—'}</p>
-                <p style={{ margin: '4px 0', color: '#4a5568' }}>Refills requested: {rx.refills}</p>
-                <button style={{ ...buttonBaseStyle, background: '#4299e1' }} onClick={() => handleRequestRefill(rx.id)}>
-                  Request Refill
-                </button>
+            ) : approvedPharmacies.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px' }}>
+                <p style={{ color: '#718096' }}>No approved pharmacies found.</p>
               </div>
-            ))}
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                {approvedPharmacies.map((pharmacy) => (
+                  <div key={pharmacy._id} style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    backgroundColor: 'white'
+                  }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: 600, color: '#2d3748', marginBottom: '8px' }}>
+                      {pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
+                    </h4>
+                    <div style={{ fontSize: '14px', color: '#718096', marginBottom: '12px' }}>
+                      <p style={{ margin: '4px 0' }}><strong>Pharmacist:</strong> {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Email:</strong> {pharmacy.email}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Phone:</strong> {pharmacy.profile?.phone || 'Not provided'}</p>
+                      <p style={{ margin: '4px 0' }}><strong>Address:</strong> {pharmacy.profile?.address || 'Not provided'}</p>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        backgroundColor: '#d1fae5',
+                        color: '#065f46'
+                      }}>
+                        Approved
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => alert('Order feature coming soon!')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 16px',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Place Order
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <style jsx>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
         );
-      case 'orders':
+      case 'prescriptions':
         return (
           <div style={{ display: 'grid', gap: '18px' }}>
             <form onSubmit={handleCatalogSearch} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
@@ -945,9 +1008,9 @@ const PatientDashboard = () => {
               <p key={`${alert}-${index}`} style={{ margin: 0, color: '#285e61', fontWeight: 500 }}>
                 • {alert}
               </p>
-            ))}
+            ))
           </div>
-        )}
+        )
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
           <div style={cardBaseStyle}>
@@ -965,6 +1028,13 @@ const PatientDashboard = () => {
             </button>
           </div>
           <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Approved Pharmacies</h3>
+            <p style={cardBodyStyle}>View approved pharmacies ready to serve you.</p>
+            <button style={actionButtonStyle(activePanel === 'approved-pharmacies', '#10b981')} onClick={() => setActivePanel('approved-pharmacies')}>
+              View Pharmacies
+            </button>
+          </div>
+          <div style={cardBaseStyle}>
             <h3 style={cardTitleStyle}>Delivery Status</h3>
             <p style={cardBodyStyle}>Confirm when a courier drops off your package.</p>
             <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
@@ -974,11 +1044,9 @@ const PatientDashboard = () => {
         </div>
 
         <div style={workspaceCardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div>
-              <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
-              <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}.</p>
-            </div>
+          <div>
+            <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
+            <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}.</p>
           </div>
           {renderPanelContent()}
         </div>
