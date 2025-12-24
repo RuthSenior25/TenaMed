@@ -1008,9 +1008,9 @@ const PatientDashboard = () => {
               <p key={`${alert}-${index}`} style={{ margin: 0, color: '#285e61', fontWeight: 500 }}>
                 • {alert}
               </p>
-            ))
+            ))}
           </div>
-        )
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
           <div style={cardBaseStyle}>
