@@ -2013,153 +2013,445 @@ onChange={(e) => setApplication((prev) => ({ ...prev, phone: e.target.value }))}
 };
 
 const DispatcherDashboard = () => {
-const navigate = useNavigate();
-const { logout } = useAuth();
-const [deliveryCount, setDeliveryCount] = useState(0);
-const [driverCount, setDriverCount] = useState(0);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [activePanel, setActivePanel] = useState('orders');
+  const [orders, setOrders] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    todayDeliveries: 0,
+    weekDeliveries: 0,
+    monthDeliveries: 0,
+    totalDeliveries: 0,
+    activeDrivers: 0,
+    pendingOrders: 0
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedDriver, setSelectedDriver] = useState(null);
 
-const handleDeliveryClick = () => {
-setDeliveryCount(deliveryCount + 1);
-};
+  // Fetch pending orders
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/orders`);
+      const data = await response.json();
+      if (data.success) {
+        setOrders(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
 
-const handleDriverClick = () => {
-setDriverCount(driverCount + 1);
-};
+  // Fetch available drivers
+  const fetchDrivers = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/drivers`);
+      const data = await response.json();
+      if (data.success) {
+        setDrivers(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+    }
+  };
 
-const handleLogout = () => {
-logout();
-navigate('/login', { replace: true });
-};
+  // Fetch active deliveries
+  const fetchDeliveries = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/deliveries`);
+      const data = await response.json();
+      if (data.success) {
+        setDeliveries(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching deliveries:', error);
+    }
+  };
 
-return (
-<div style={{
-minHeight: '100vh',
-background: '#f7fafc',
-padding: '20px'
-}}>
-<div style={{
-maxWidth: '1200px',
-margin: '0 auto'
-}}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-<div>
-<h1 style={{
-fontSize: '32px',
-fontWeight: 'bold',
-color: '#2d3748',
-marginBottom: '6px'
-}}>Dispatcher Dashboard</h1>
-<p style={{
-fontSize: '16px',
-color: '#718096',
-margin: 0
-}}>Coordinate deliveries and track shipments</p>
-</div>
-<button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
-Logout
-</button>
-</div>
+  // Fetch analytics
+  const fetchAnalytics = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/analytics`);
+      const data = await response.json();
+      if (data.success) {
+        setAnalytics(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
+  };
 
-<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-<div style={{
-background: 'white',
-padding: '24px',
-borderRadius: '12px',
-boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-}}>
-<h3 style={{
-fontSize: '18px',
-fontWeight: '600',
-color: '#2d3748',
-marginBottom: '16px'
-}}>Active Deliveries</h3>
-<p style={{
-color: '#718096',
-marginBottom: '16px'
-}}>You have {deliveryCount} active deliveries</p>
-<button
-style={{
-background: '#4299e1',
-color: 'white',
-padding: '8px 16px',
-borderRadius: '6px',
-border: 'none',
-cursor: 'pointer'
-}}
-onClick={handleDeliveryClick}
->View Deliveries</button>
-</div>
+  // Assign driver to order
+  const assignDriver = async (orderId, driverId) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, driverId })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Driver assigned successfully!');
+        fetchOrders();
+        fetchDrivers();
+        fetchDeliveries();
+        setSelectedOrder(null);
+        setSelectedDriver(null);
+      }
+    } catch (error) {
+      console.error('Error assigning driver:', error);
+      alert('Failed to assign driver');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-<div style={{
-background: 'white',
-padding: '24px',
-borderRadius: '12px',
-boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-}}>
-<h3 style={{
-fontSize: '18px',
-fontWeight: '600',
-color: '#2d3748',
-marginBottom: '16px'
-}}>Assign Drivers</h3>
-<p style={{
-color: '#718096',
-marginBottom: '16px'
-}}>You have {driverCount} available drivers</p>
-<button
-style={{
-background: '#48bb78',
-color: 'white',
-padding: '8px 16px',
-borderRadius: '6px',
-border: 'none',
-cursor: 'pointer'
-}}
-onClick={handleDriverClick}
->Assign Tasks</button>
-</div>
+  // Update delivery status
+  const updateDeliveryStatus = async (deliveryId, status) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/status/${deliveryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Delivery status updated successfully!');
+        fetchDeliveries();
+        fetchDrivers();
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Failed to update status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-<div style={{
-background: 'white',
-padding: '24px',
-borderRadius: '12px',
-boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-}}>
-<h3 style={{
-fontSize: '18px',
-fontWeight: '600',
-color: '#2d3748',
-marginBottom: '16px'
-}}>Delivery Map</h3>
-<p style={{
-color: '#718096',
-marginBottom: '16px'
+  // Process payment
+  const processPayment = async (orderId, paymentMethod, amount) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, paymentMethod, amount })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Payment processed successfully!');
+        fetchOrders();
+        fetchDeliveries();
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Failed to process payment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-}}>View real-time delivery locations</p>
-<button
-style={{
-background: '#ed8936',
-color: 'white',
-padding: '8px 16px',
-borderRadius: '6px',
-border: 'none',
-cursor: 'pointer'
-}}
->View Map</button>
-</div>
-</div>
-</div>
-</div>
-);
+  useEffect(() => {
+    fetchOrders();
+    fetchDrivers();
+    fetchDeliveries();
+    fetchAnalytics();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const renderPanelContent = () => {
+    switch (activePanel) {
+      case 'orders':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Pending Orders</h3>
+            {orders.length === 0 ? (
+              <p style={{ color: '#718096' }}>No pending orders</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {orders.map((order) => (
+                  <div key={order._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          Order #{order._id.slice(-8)}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Pharmacy: {order.pharmacyId?.pharmacyName}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Patient: {order.patientId?.email}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Total: ${order.totalAmount}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Address: {order.deliveryAddress?.street}, {order.deliveryAddress?.city}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          style={{ ...buttonBaseStyle, background: '#3182ce' }}
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          Assign Driver
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'drivers':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Available Drivers</h3>
+            {drivers.length === 0 ? (
+              <p style={{ color: '#718096' }}>No available drivers</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {drivers.map((driver) => (
+                  <div key={driver._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          {driver.profile?.firstName} {driver.profile?.lastName}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          {driver.email}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Vehicle: {driver.vehicleType}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Rating: {driver.deliveryStats?.rating || 'N/A'}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          backgroundColor: driver.isAvailable ? '#d1fae5' : '#fee2e2',
+                          color: driver.isAvailable ? '#065f46' : '#991b1b'
+                        }}>
+                          {driver.isAvailable ? 'Available' : 'Busy'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'deliveries':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Active Deliveries</h3>
+            {deliveries.length === 0 ? (
+              <p style={{ color: '#718096' }}>No active deliveries</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {deliveries.map((delivery) => (
+                  <div key={delivery._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          Tracking: {delivery.trackingCode}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Driver: {delivery.driverId?.profile?.firstName} {delivery.driverId?.profile?.lastName}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Status: {delivery.status}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Assigned: {new Date(delivery.assignedAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                        <select
+                          value={delivery.status}
+                          onChange={(e) => updateDeliveryStatus(delivery._id, e.target.value)}
+                          style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+                        >
+                          <option value="assigned">Assigned</option>
+                          <option value="picked_up">Picked Up</option>
+                          <option value="in_transit">In Transit</option>
+                          <option value="delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={dashboardShellStyle}>
+      <div style={dashboardContentStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
+              Dispatcher Dashboard
+            </h1>
+            <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>
+              Coordinate deliveries and track shipments
+            </p>
+          </div>
+          <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+
+        {/* Analytics Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ ...cardBaseStyle, padding: '20px' }}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>Today's Deliveries</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.todayDeliveries}</div>
+          </div>
+          <div style={{ ...cardBaseStyle, padding: '20px' }}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>This Week</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.weekDeliveries}</div>
+          </div>
+          <div style={{ ...cardBaseStyle, padding: '20px' }}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>This Month</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.monthDeliveries}</div>
+          </div>
+          <div style={{ ...cardBaseStyle, padding: '20px' }}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>Active Drivers</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.activeDrivers}</div>
+          </div>
+          <div style={{ ...cardBaseStyle, padding: '20px' }}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>Pending Orders</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.pendingOrders}</div>
+          </div>
+        </div>
+
+        {/* Navigation Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Pending Orders</h3>
+            <p style={cardBodyStyle}>View and assign drivers to pending orders</p>
+            <button style={actionButtonStyle(activePanel === 'orders', '#4299e1')} onClick={() => setActivePanel('orders')}>
+              View Orders ({orders.length})
+            </button>
+          </div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Available Drivers</h3>
+            <p style={cardBodyStyle}>Manage driver availability and assignments</p>
+            <button style={actionButtonStyle(activePanel === 'drivers', '#48bb78')} onClick={() => setActivePanel('drivers')}>
+              View Drivers ({drivers.length})
+            </button>
+          </div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Active Deliveries</h3>
+            <p style={cardBodyStyle}>Track ongoing deliveries and update status</p>
+            <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
+              View Deliveries ({deliveries.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Workspace */}
+        <div style={workspaceCardStyle}>
+          <div>
+            <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
+            <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}</p>
+          </div>
+          {renderPanelContent()}
+        </div>
+
+        {/* Driver Assignment Modal */}
+        {selectedOrder && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '24px',
+              borderRadius: '12px',
+              maxWidth: '500px',
+              width: '90%'
+            }}>
+              <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Assign Driver to Order</h3>
+              <p style={{ margin: '0 0 16px', color: '#4a5568' }}>
+                Order #{selectedOrder._id.slice(-8)} - ${selectedOrder.totalAmount}
+              </p>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Select Driver:</label>
+                <select
+                  value={selectedDriver || ''}
+                  onChange={(e) => setSelectedDriver(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+                >
+                  <option value="">Choose a driver...</option>
+                  {drivers.map((driver) => (
+                    <option key={driver._id} value={driver._id}>
+                      {driver.profile?.firstName} {driver.profile?.lastName} - {driver.vehicleType}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => { setSelectedOrder(null); setSelectedDriver(null); }}
+                  style={{ ...buttonBaseStyle, background: '#718096' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => assignDriver(selectedOrder._id, selectedDriver)}
+                  disabled={!selectedDriver || isLoading}
+                  style={{ ...buttonBaseStyle, background: '#3182ce', opacity: selectedDriver ? 1 : 0.5 }}
+                >
+                  {isLoading ? 'Assigning...' : 'Assign Driver'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 // Role-based dashboard router
 const DashboardRouter = () => {
-const { user } = useAuth();
+  const { user } = useAuth();
 
-if (!user) {
-return <Navigate to="/login" />;
-}
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
 
 const isPharmacyApproved = (pharmacyProfile) => {
 if (!pharmacyProfile) return false;

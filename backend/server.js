@@ -90,6 +90,7 @@ app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/delivery', require('./routes/delivery'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/dispatcher', require('./routes/dispatcher'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

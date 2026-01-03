@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['patient', 'pharmacy', 'admin', 'dispatcher', 'system'],
+    enum: ['patient', 'pharmacy', 'admin', 'dispatcher', 'driver', 'system'],
     default: 'patient'
   },
   profile: {
@@ -63,6 +63,36 @@ const userSchema = new mongoose.Schema({
     }
   },
   lastLogin: { type: Date },
+  // Driver specific fields
+  isAvailable: {
+    type: Boolean,
+    default: function() {
+      return this.role === 'driver';
+    }
+  },
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number],
+      default: [0, 0]
+    }
+  },
+  vehicleType: {
+    type: String,
+    enum: ['motorcycle', 'car', 'van', 'bicycle'],
+    default: 'motorcycle'
+  },
+  licensePlate: String,
+  deliveryStats: {
+    totalDeliveries: { type: Number, default: 0 },
+    successfulDeliveries: { type: Number, default: 0 },
+    averageDeliveryTime: { type: Number, default: 0 },
+    rating: { type: Number, default: 5.0 }
+  },
   createdAt: {
     type: Date,
     default: Date.now
