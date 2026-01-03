@@ -500,16 +500,22 @@ const statCards = [
 
 useEffect(() => {
 const fetchApprovedPharmacies = async () => {
-try {
-setIsLoadingPharmacies(true);
-const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`);
-const data = await response.json();
-setApprovedPharmacies(data.pharmacies || []);
-} catch (error) {
-console.error('Error fetching approved pharmacies:', error);
-} finally {
-setIsLoadingPharmacies(false);
-}
+  try {
+    setIsLoadingPharmacies(true);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    const data = await response.json();
+    console.log('Approved pharmacies response:', data); // Debug log
+    setApprovedPharmacies(data.pharmacies || []);
+  } catch (error) {
+    console.error('Error fetching approved pharmacies:', error);
+  } finally {
+    setIsLoadingPharmacies(false);
+  }
 };
 
 fetchApprovedPharmacies();

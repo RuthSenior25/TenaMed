@@ -452,4 +452,23 @@ router.patch('/pharmacy/:id/status', authenticate, authorize('admin'), async (re
   }
 });
 
+// Get approved pharmacies
+router.get('/approved-pharmacies', auth.authenticateToken, async (req, res) => {
+  try {
+    const approvedPharmacies = await User.find({ 
+      role: 'pharmacy', 
+      status: 'approved',
+      isActive: true 
+    }).select('email profile pharmacyName');
+
+    res.json({
+      success: true,
+      pharmacies: approvedPharmacies
+    });
+  } catch (error) {
+    console.error('Error fetching approved pharmacies:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
