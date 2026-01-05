@@ -380,4 +380,96 @@ router.get('/:id/stats', authenticate, async (req, res) => {
   }
 });
 
+// Get nearby pharmacies (public endpoint)
+router.get('/nearby', async (req, res) => {
+  try {
+    const { 
+      lat, 
+      lng, 
+      radius = 10, // Default 10km radius
+      limit = 20 
+    } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        message: 'Latitude and longitude are required'
+      });
+    }
+
+    const userLat = parseFloat(lat);
+    const userLng = parseFloat(lng);
+    const searchRadius = parseFloat(radius) || 10;
+    const searchLimit = parseInt(limit) || 20;
+
+    // Find pharmacies within radius (simplified distance calculation)
+    const latRange = searchRadius / 111; // Approximate degrees
+    const lngRange = searchRadius / (111 * Math.cos(userLat * Math.PI / 180));
+
+    const pharmacies = await User.find({
+      role: 'pharmacy',
+      status: 'approved',
+      isActive: true,
+      'pharmacyLocation.coordinates.lat': {
+        $gte: userLat - latRange,
+        $lte: userLat + latRange
+      },
+      'pharmacyLocation.coordinates.lng': {
+        $gte: userLng - lngRange,
+        $lte: userLng + lngRange
+      }
+    }).select('email profile pharmacyName pharmacyLocation operatingHours')
+    .limit(searchLimit);
+
+    // Calculate distances and format response
+    const pharmaciesWithDistance = pharmacies.map(pharmacy => {
+      const pharmacyData = pharmacy.toObject();
+      
+      if (pharmacy.pharmacyLocation?.coordinates?.lat && pharmacy.pharmacyLocation?.coordinates?.lng) {
+        // Calculate distance using Haversine formula
+        const pharmLat = pharmacy.pharmacyLocation.coordinates.lat;
+        const pharmLng = pharmacy.pharmacyLocation.coordinates.lng;
+        
+        const R = 6371; // Earth's radius in km
+        const dLat = (pharmLat - userLat) * Math.PI / 180;
+        const dLon = (pharmLng - userLng) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(userLat * Math.PI / 180) * Math.cos(pharmLat * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        pharmacyData.distance = Math.round(distance * 10) / 10; // Round to 1 decimal
+        pharmacyData.location = {
+          coordinates: [pharmacy.pharmacyLocation.coordinates.lng, pharmacy.pharmacyLocation.coordinates.lat]
+        };
+        pharmacyData.address = {
+          street: pharmacy.pharmacyLocation.address,
+          city: pharmacy.pharmacyLocation.city,
+          kebele: pharmacy.pharmacyLocation.kebele,
+          postalCode: pharmacy.pharmacyLocation.postalCode
+        };
+        pharmacyData.phone = pharmacy.profile?.phone;
+      }
+      
+      return pharmacyData;
+    });
+
+    // Sort by distance
+    pharmaciesWithDistance.sort((a, b) => a.distance - b.distance);
+
+    res.json({
+      success: true,
+      pharmacies: pharmaciesWithDistance,
+      searchCriteria: {
+        location: { lat: userLat, lng: userLng, radius: `${searchRadius}km` },
+        totalFound: pharmaciesWithDistance.length
+      }
+    });
+  } catch (error) {
+    console.error('Get nearby pharmacies error:', error);
+    res.status(500).json({ message: 'Server error while fetching nearby pharmacies' });
+  }
+});
+
 module.exports = router;

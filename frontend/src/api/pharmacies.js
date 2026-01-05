@@ -52,6 +52,7 @@ export const pharmaciesAPI = {
         searchParams.append(key, params[key]);
       }
     });
+    console.log('Searching nearby pharmacies with params:', searchParams.toString());
     return api.get(`/pharmacies/nearby?${searchParams}`);
   },
 };
