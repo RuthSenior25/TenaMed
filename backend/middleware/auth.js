@@ -225,6 +225,29 @@ const optionalAuth = async (req, res, next) => {
   next();
 };
 
+// Role checking middleware
+const checkRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED'
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+        code: 'INSUFFICIENT_PERMISSIONS'
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   generateToken,
   verifyToken,
@@ -232,5 +255,6 @@ module.exports = {
   authorize,
   requireApproval,
   checkPharmacyOwnership,
-  optionalAuth
+  optionalAuth,
+  checkRole
 };

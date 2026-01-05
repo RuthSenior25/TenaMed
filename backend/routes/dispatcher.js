@@ -7,7 +7,7 @@ const Delivery = require('../models/Delivery');
 const Pharmacy = require('../models/Pharmacy');
 
 // Get pending orders for dispatcher
-router.get('/orders', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const orders = await Order.find({ 
       status: 'confirmed',
@@ -28,7 +28,7 @@ router.get('/orders', auth.authenticateToken, auth.checkRole(['dispatcher']), as
 });
 
 // Get available drivers
-router.get('/drivers', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.get('/drivers', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const drivers = await User.find({ 
       role: 'driver',
@@ -46,7 +46,7 @@ router.get('/drivers', auth.authenticateToken, auth.checkRole(['dispatcher']), a
 });
 
 // Assign driver to order
-router.post('/assign', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.post('/assign', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const { orderId, driverId } = req.body;
 
@@ -87,7 +87,7 @@ router.post('/assign', auth.authenticateToken, auth.checkRole(['dispatcher']), a
 });
 
 // Update delivery status
-router.put('/status/:deliveryId', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.put('/status/:deliveryId', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const { status } = req.body;
     const { deliveryId } = req.params;
@@ -126,7 +126,7 @@ router.put('/status/:deliveryId', auth.authenticateToken, auth.checkRole(['dispa
 });
 
 // Get active deliveries
-router.get('/deliveries', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.get('/deliveries', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const deliveries = await Delivery.find({
       status: { $in: ['assigned', 'picked_up', 'in_transit'] }
@@ -147,7 +147,7 @@ router.get('/deliveries', auth.authenticateToken, auth.checkRole(['dispatcher'])
 });
 
 // Process payment
-router.post('/payment', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.post('/payment', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const { orderId, paymentMethod, amount } = req.body;
 
@@ -178,7 +178,7 @@ router.post('/payment', auth.authenticateToken, auth.checkRole(['dispatcher']), 
 });
 
 // Get delivery analytics
-router.get('/analytics', auth.authenticateToken, auth.checkRole(['dispatcher']), async (req, res) => {
+router.get('/analytics', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const today = new Date();
     const startOfDay = new Date(today.setHours(0, 0, 0, 0));
