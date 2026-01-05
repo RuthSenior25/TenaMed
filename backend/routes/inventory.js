@@ -410,18 +410,75 @@ router.post('/check-availability', async (req, res) => {
       });
     }
 
-    // Find the drug first
+    // Clean and normalize the medicine name
+    const cleanMedicineName = medicineName.trim().toLowerCase();
+    
+    // Create multiple search patterns for better matching
+    const searchPatterns = [
+      // Exact match
+      cleanMedicineName,
+      // Remove common variations and spacing
+      cleanMedicineName.replace(/\s+/g, ''),
+      cleanMedicineName.replace(/[^a-z0-9]/g, ''),
+      // Handle common misspellings
+      cleanMedicineName.replace(/amoxicilin/g, 'amoxicillin'),
+      cleanMedicineName.replace(/amox/g, 'amoxicillin'),
+      // Split and search parts
+      ...cleanMedicineName.split(/\s+/).filter(part => part.length > 2)
+    ];
+
+    console.log('Searching for medicine:', medicineName, 'patterns:', searchPatterns);
+
+    // Find the drug with flexible matching
     const Drug = require('../models/Drug');
-    const drug = await Drug.findOne({ 
-      name: { $regex: medicineName, $options: 'i' } 
+    
+    // Try multiple search strategies
+    let drug = null;
+    
+    // Strategy 1: Text search (most flexible)
+    drug = await Drug.findOne({
+      $text: { $search: cleanMedicineName },
+      isActive: true
     });
+
+    // Strategy 2: Regex patterns if text search fails
+    if (!drug) {
+      for (const pattern of searchPatterns) {
+        drug = await Drug.findOne({
+          $or: [
+            { name: { $regex: pattern, $options: 'i' } },
+            { genericName: { $regex: pattern, $options: 'i' } },
+            { brandName: { $regex: pattern, $options: 'i' } }
+          ],
+          isActive: true
+        });
+        if (drug) break;
+      }
+    }
+
+    // Strategy 3: Partial matching if still not found
+    if (!drug) {
+      const partialPattern = cleanMedicineName.substring(0, Math.min(6, cleanMedicineName.length));
+      drug = await Drug.findOne({
+        $or: [
+          { name: { $regex: partialPattern, $options: 'i' } },
+          { genericName: { $regex: partialPattern, $options: 'i' } },
+          { brandName: { $regex: partialPattern, $options: 'i' } }
+        ],
+        isActive: true
+      });
+    }
 
     if (!drug) {
       return res.json({
         success: false,
-        error: 'Medicine not found in database'
+        error: 'Medicine not found in database',
+        searchAttempted: cleanMedicineName,
+        suggestions: ['amoxicillin', 'paracetamol', 'ibuprofen', 'aspirin', 'ciprofloxacin']
       });
     }
+
+    console.log('Found drug:', drug.name);
 
     // Check inventory at the specific pharmacy
     const inventory = await Inventory.findOne({
@@ -429,12 +486,13 @@ router.post('/check-availability', async (req, res) => {
       drug: drug._id,
       isActive: true,
       quantity: { $gt: 0 }
-    }).populate('drug', 'name description');
+    }).populate('drug', 'name description genericName brandName strength');
 
     if (!inventory) {
       return res.json({
         success: false,
-        error: 'Medicine not available at this pharmacy'
+        error: 'Medicine not available at this pharmacy',
+        drugFound: drug.name
       });
     }
 
