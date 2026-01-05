@@ -503,14 +503,24 @@ const fetchApprovedPharmacies = async () => {
   try {
     setIsLoadingPharmacies(true);
     const token = localStorage.getItem('token');
+    console.log('Token found:', token ? 'Yes' : 'No'); // Debug log
+    
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`, {
       headers: {
-        'Authorization': token ? `Bearer ${token}` : ''
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
       }
     });
+    
+    console.log('Response status:', response.status); // Debug log
     const data = await response.json();
     console.log('Approved pharmacies response:', data); // Debug log
-    setApprovedPharmacies(data.pharmacies || []);
+    
+    if (data.success) {
+      setApprovedPharmacies(data.pharmacies || []);
+    } else {
+      console.error('API returned error:', data.message);
+    }
   } catch (error) {
     console.error('Error fetching approved pharmacies:', error);
   } finally {
