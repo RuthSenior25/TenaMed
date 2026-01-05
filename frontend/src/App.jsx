@@ -451,6 +451,19 @@ const { priceBoard } = useSupplyChain();
 const [activePanel, setActivePanel] = useState('pharmacies');
 const [approvedPharmacies, setApprovedPharmacies] = useState([]);
 const [isLoadingPharmacies, setIsLoadingPharmacies] = useState(true);
+const [showOrderModal, setShowOrderModal] = useState(false);
+const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+const [orderForm, setOrderForm] = useState({
+  medications: [{ name: '', quantity: 1, instructions: '' }],
+  deliveryAddress: {
+    street: '',
+    city: '',
+    kebele: '',
+    postalCode: ''
+  },
+  notes: ''
+});
+const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [prescriptions, setPrescriptions] = useState([
 { id: 'RX-1023', drug: 'Amoxicillin 500mg', dosage: '2x / day', frequency: 'Morning & Night', refills: 1 },
 { id: 'RX-0991', drug: 'Metformin 850mg', dosage: '1x / day', frequency: 'Evening', refills: 3 },
@@ -465,7 +478,6 @@ const [deliveries, setDeliveries] = useState([
 ]);
 const [alerts, setAlerts] = useState([]);
 const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '' });
-const [orderForm, setOrderForm] = useState({ medication: '', quantity: '1', instructions: '' });
 const [catalogQuery, setCatalogQuery] = useState('');
 const [catalogFilter, setCatalogFilter] = useState('');
 const createFilterShape = () => ({
@@ -579,16 +591,25 @@ recordAlert(`${newRx.drug} saved to prescriptions.`);
 
 const handleOrderSubmit = (event) => {
 event.preventDefault();
-if (!orderForm.medication.trim()) return;
+if (!orderForm.medications[0].name.trim()) return;
 const newOrder = {
 id: `ORD-${Math.floor(Math.random() * 9000 + 2000)}`,
-medication: orderForm.medication.trim(),
-quantity: Number(orderForm.quantity) || 1,
-notes: orderForm.instructions.trim(),
+medication: orderForm.medications[0].name.trim(),
+quantity: Number(orderForm.medications[0].quantity) || 1,
+notes: orderForm.medications[0].instructions.trim(),
 status: 'Draft',
 };
 setOrders((prev) => [newOrder, ...prev]);
-setOrderForm({ medication: '', quantity: '1', instructions: '' });
+setOrderForm({
+  medications: [{ name: '', quantity: 1, instructions: '' }],
+  deliveryAddress: {
+    street: '',
+    city: '',
+    kebele: '',
+    postalCode: ''
+  },
+  notes: ''
+});
 setActivePanel('orders');
 recordAlert(`Draft order ${newOrder.id} created.`);
 };
@@ -612,9 +633,60 @@ recordAlert(`Refill request sent for ${rxId}.`);
 };
 
 const handleSelectMedicine = (med) => {
-setOrderForm((prev) => ({ ...prev, medication: med.name }));
+setOrderForm((prev) => ({ 
+  ...prev, 
+  medications: [{ ...prev.medications[0], name: med.name }]
+}));
 recordAlert(`${med.name} added to the order form.`);
 setActivePanel('orders');
+};
+
+// Submit order to pharmacy
+const submitOrderToPharmacy = async (pharmacyId) => {
+  try {
+    setIsSubmittingOrder(true);
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    const orderData = {
+      pharmacyId,
+      medications: orderForm.medications.filter(med => med.name.trim()),
+      deliveryAddress: orderForm.deliveryAddress,
+      notes: orderForm.notes,
+      totalAmount: orderForm.medications.reduce((sum, med) => sum + (med.quantity * 100), 0) // Simple calculation
+    };
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('Order submitted successfully! The pharmacy will prepare your order.');
+      setShowOrderModal(false);
+      setSelectedPharmacy(null);
+      setOrderForm({
+        medications: [{ name: '', quantity: 1, instructions: '' }],
+        deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+        notes: ''
+      });
+      // Refresh orders list
+      // fetchOrders(); // You might need to implement this
+    } else {
+      alert('Failed to submit order: ' + (data.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error submitting order:', error);
+    alert('Failed to submit order. Please try again.');
+  } finally {
+    setIsSubmittingOrder(false);
+  }
 };
 
 const handleCompareMedicine = (med) => {
@@ -705,7 +777,10 @@ Approved
 </span>
 </div>
 <button
-onClick={() => alert('Order feature coming soon!')}
+onClick={() => {
+  setSelectedPharmacy(pharmacy);
+  setShowOrderModal(true);
+}}
 style={{
 width: '100%',
 padding: '8px 16px',
@@ -1066,6 +1141,164 @@ View Deliveries
 </div>
 {renderPanelContent()}
 </div>
+
+{/* Order Modal */}
+{showOrderModal && selectedPharmacy && (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  }}>
+    <div style={{
+      backgroundColor: 'white',
+      padding: '24px',
+      borderRadius: '12px',
+      maxWidth: '600px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflowY: 'auto'
+    }}>
+      <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>
+        Place Order - {selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}
+      </h3>
+      
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Medications:</label>
+        {orderForm.medications.map((med, index) => (
+          <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            <input
+              type="text"
+              placeholder="Medication name"
+              value={med.name}
+              onChange={(e) => {
+                const newMeds = [...orderForm.medications];
+                newMeds[index].name = e.target.value;
+                setOrderForm(prev => ({ ...prev, medications: newMeds }));
+              }}
+              style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+            />
+            <input
+              type="number"
+              min="1"
+              placeholder="Qty"
+              value={med.quantity}
+              onChange={(e) => {
+                const newMeds = [...orderForm.medications];
+                newMeds[index].quantity = parseInt(e.target.value) || 1;
+                setOrderForm(prev => ({ ...prev, medications: newMeds }));
+              }}
+              style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+            />
+            <input
+              type="text"
+              placeholder="Instructions"
+              value={med.instructions}
+              onChange={(e) => {
+                const newMeds = [...orderForm.medications];
+                newMeds[index].instructions = e.target.value;
+                setOrderForm(prev => ({ ...prev, medications: newMeds }));
+              }}
+              style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => {
+            setOrderForm(prev => ({
+              ...prev,
+              medications: [...prev.medications, { name: '', quantity: 1, instructions: '' }]
+            }));
+          }}
+          style={{ padding: '4px 8px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '4px', fontSize: '12px' }}
+        >
+          + Add Medication
+        </button>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Delivery Address:</label>
+        <input
+          type="text"
+          placeholder="Street"
+          value={orderForm.deliveryAddress.street}
+          onChange={(e) => setOrderForm(prev => ({
+            ...prev,
+            deliveryAddress: { ...prev.deliveryAddress, street: e.target.value }
+          }))}
+          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0', marginBottom: '8px' }}
+        />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="text"
+            placeholder="City"
+            value={orderForm.deliveryAddress.city}
+            onChange={(e) => setOrderForm(prev => ({
+              ...prev,
+              deliveryAddress: { ...prev.deliveryAddress, city: e.target.value }
+            }))}
+            style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+          />
+          <input
+            type="text"
+            placeholder="Kebele"
+            value={orderForm.deliveryAddress.kebele}
+            onChange={(e) => setOrderForm(prev => ({
+              ...prev,
+              deliveryAddress: { ...prev.deliveryAddress, kebele: e.target.value }
+            }))}
+            style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+          />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Additional Notes:</label>
+        <textarea
+          placeholder="Any special instructions..."
+          value={orderForm.notes}
+          onChange={(e) => setOrderForm(prev => ({ ...prev, notes: e.target.value }))}
+          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0', minHeight: '80px' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => {
+            setShowOrderModal(false);
+            setSelectedPharmacy(null);
+            setOrderForm({
+              medications: [{ name: '', quantity: 1, instructions: '' }],
+              deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+              notes: ''
+            });
+          }}
+          style={{ ...buttonBaseStyle, background: '#718096' }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => submitOrderToPharmacy(selectedPharmacy._id)}
+          disabled={isSubmittingOrder || !orderForm.medications.some(med => med.name.trim())}
+          style={{ 
+            ...buttonBaseStyle, 
+            background: '#3182ce', 
+            opacity: (isSubmittingOrder || !orderForm.medications.some(med => med.name.trim())) ? 0.5 : 1 
+          }}
+        >
+          {isSubmittingOrder ? 'Submitting...' : 'Submit Order'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 </div>
 </div>
 );
