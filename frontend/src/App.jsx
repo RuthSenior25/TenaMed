@@ -464,6 +464,8 @@ const [orderForm, setOrderForm] = useState({
   notes: ''
 });
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+const [checkingAvailability, setCheckingAvailability] = useState({});
+const [availabilityResults, setAvailabilityResults] = useState({});
 const [prescriptions, setPrescriptions] = useState([
 { id: 'RX-1023', drug: 'Amoxicillin 500mg', dosage: '2x / day', frequency: 'Morning & Night', refills: 1 },
 { id: 'RX-0991', drug: 'Metformin 850mg', dosage: '1x / day', frequency: 'Evening', refills: 3 },
@@ -541,6 +543,7 @@ const fetchApprovedPharmacies = async () => {
 };
 
 fetchApprovedPharmacies();
+fetchDeliveries(); // Fetch real delivery data
 }, []);
 
 const recordAlert = (message) => setAlerts((prev) => [message, ...prev].slice(0, 4));
@@ -614,15 +617,39 @@ setActivePanel('orders');
 recordAlert(`Draft order ${newOrder.id} created.`);
 };
 
-const handleConfirmDelivery = (deliveryId) => {
-setDeliveries((prev) =>
-prev.map((delivery) =>
-delivery.id === deliveryId
-? { ...delivery, status: 'Delivered', eta: 'Delivered just now' }
-: delivery
-)
-);
-recordAlert(`Delivery ${deliveryId} marked as received.`);
+// Fetch real delivery data
+const fetchDeliveries = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      // Convert orders to delivery format for display
+      const deliveryData = data.data.map(order => ({
+        id: order._id,
+        medication: order.medications.map(med => med.name).join(', '),
+        quantity: order.medications.reduce((sum, med) => sum + med.quantity, 0),
+        courier: order.assignedDriver ? 'Assigned Driver' : 'Pending Assignment',
+        eta: order.deliveryStatus === 'delivered' ? 'Delivered' : 
+               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
+        status: order.deliveryStatus === 'delivered' ? 'Delivered' : 
+               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
+        createdAt: order.createdAt,
+        pharmacy: order.pharmacyId?.pharmacyName
+      }));
+      
+      setDeliveries(deliveryData);
+    }
+  } catch (error) {
+    console.error('Error fetching deliveries:', error);
+  }
 };
 
 const handleRequestRefill = (rxId) => {
@@ -686,6 +713,41 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     alert('Failed to submit order. Please try again.');
   } finally {
     setIsSubmittingOrder(false);
+  }
+};
+
+// Check medicine availability
+const checkMedicineAvailability = async (medicationName, medicationIndex) => {
+  if (!medicationName.trim() || !selectedPharmacy) return;
+  
+  try {
+    setCheckingAvailability(prev => ({ ...prev, [medicationIndex]: true }));
+    
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        pharmacyId: selectedPharmacy._id,
+        medicineName: medicationName.trim()
+      })
+    });
+
+    const data = await response.json();
+    
+    setAvailabilityResults(prev => ({
+      ...prev,
+      [medicationIndex]: data
+    }));
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    setAvailabilityResults(prev => ({
+      ...prev,
+      [medicationIndex]: { success: false, error: 'Failed to check availability' }
+    }));
+  } finally {
+    setCheckingAvailability(prev => ({ ...prev, [medicationIndex]: false }));
   }
 };
 
@@ -1172,40 +1234,81 @@ View Deliveries
       <div style={{ marginBottom: '16px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Medications:</label>
         {orderForm.medications.map((med, index) => (
-          <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <div key={index} style={{ marginBottom: '16px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input
+                type="text"
+                placeholder="Medication name"
+                value={med.name}
+                onChange={(e) => {
+                  const newMeds = [...orderForm.medications];
+                  newMeds[index].name = e.target.value;
+                  setOrderForm(prev => ({ ...prev, medications: newMeds }));
+                  // Clear availability when name changes
+                  setAvailabilityResults(prev => ({ ...prev, [index]: null }));
+                }}
+                onBlur={() => med.name.trim() && checkMedicineAvailability(med.name, index)}
+                style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+              />
+              <input
+                type="number"
+                min="1"
+                placeholder="Qty"
+                value={med.quantity}
+                onChange={(e) => {
+                  const newMeds = [...orderForm.medications];
+                  newMeds[index].quantity = parseInt(e.target.value) || 1;
+                  setOrderForm(prev => ({ ...prev, medications: newMeds }));
+                }}
+                style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+              />
+            </div>
+            
+            {/* Availability Check Results */}
+            {availabilityResults[index] && (
+              <div style={{ 
+                padding: '8px', 
+                borderRadius: '6px', 
+                fontSize: '12px',
+                backgroundColor: availabilityResults[index].success ? '#d4edda' : '#f8d7da',
+                color: availabilityResults[index].success ? '#155724' : '#721c24'
+              }}>
+                {availabilityResults[index].success ? (
+                  <div>
+                    <strong>✓ Available</strong> - {availabilityResults[index].quantity} units in stock
+                    {availabilityResults[index].price && ` • ${availabilityResults[index].price} ETB per unit`}
+                  </div>
+                ) : (
+                  <div>
+                    <strong>✗ Not Available</strong> - {availabilityResults[index].error || 'Out of stock'}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Checking Availability Indicator */}
+            {checkingAvailability[index] && (
+              <div style={{ 
+                padding: '8px', 
+                borderRadius: '6px', 
+                fontSize: '12px',
+                backgroundColor: '#fff3cd',
+                color: '#856404'
+              }}>
+                <strong>Checking availability...</strong>
+              </div>
+            )}
+            
             <input
               type="text"
-              placeholder="Medication name"
-              value={med.name}
-              onChange={(e) => {
-                const newMeds = [...orderForm.medications];
-                newMeds[index].name = e.target.value;
-                setOrderForm(prev => ({ ...prev, medications: newMeds }));
-              }}
-              style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-            />
-            <input
-              type="number"
-              min="1"
-              placeholder="Qty"
-              value={med.quantity}
-              onChange={(e) => {
-                const newMeds = [...orderForm.medications];
-                newMeds[index].quantity = parseInt(e.target.value) || 1;
-                setOrderForm(prev => ({ ...prev, medications: newMeds }));
-              }}
-              style={{ width: '80px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-            />
-            <input
-              type="text"
-              placeholder="Instructions"
+              placeholder="Instructions (e.g., take with food)"
               value={med.instructions}
               onChange={(e) => {
                 const newMeds = [...orderForm.medications];
                 newMeds[index].instructions = e.target.value;
                 setOrderForm(prev => ({ ...prev, medications: newMeds }));
               }}
-              style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
             />
           </div>
         ))}
@@ -1286,11 +1389,17 @@ View Deliveries
         </button>
         <button
           onClick={() => submitOrderToPharmacy(selectedPharmacy._id)}
-          disabled={isSubmittingOrder || !orderForm.medications.some(med => med.name.trim())}
+          disabled={isSubmittingOrder || !orderForm.medications.some(med => med.name.trim()) || 
+            orderForm.medications.some((med, index) => 
+              med.name.trim() && (!availabilityResults[index] || !availabilityResults[index].success)
+            )}
           style={{ 
             ...buttonBaseStyle, 
             background: '#3182ce', 
-            opacity: (isSubmittingOrder || !orderForm.medications.some(med => med.name.trim())) ? 0.5 : 1 
+            opacity: (isSubmittingOrder || !orderForm.medications.some(med => med.name.trim()) || 
+              orderForm.medications.some((med, index) => 
+                med.name.trim() && (!availabilityResults[index] || !availabilityResults[index].success)
+              )) ? 0.5 : 1 
           }}
         >
           {isSubmittingOrder ? 'Submitting...' : 'Submit Order'}

@@ -398,4 +398,74 @@ router.get('/stats/overview', authenticate, authorize('pharmacy', 'admin'), asyn
   }
 });
 
+// Check medicine availability at specific pharmacy
+router.post('/check-availability', async (req, res) => {
+  try {
+    const { pharmacyId, medicineName } = req.body;
+
+    if (!pharmacyId || !medicineName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pharmacy ID and medicine name are required'
+      });
+    }
+
+    // Find the drug first
+    const Drug = require('../models/Drug');
+    const drug = await Drug.findOne({ 
+      name: { $regex: medicineName, $options: 'i' } 
+    });
+
+    if (!drug) {
+      return res.json({
+        success: false,
+        error: 'Medicine not found in database'
+      });
+    }
+
+    // Check inventory at the specific pharmacy
+    const inventory = await Inventory.findOne({
+      pharmacy: pharmacyId,
+      drug: drug._id,
+      isActive: true,
+      quantity: { $gt: 0 }
+    }).populate('drug', 'name description');
+
+    if (!inventory) {
+      return res.json({
+        success: false,
+        error: 'Medicine not available at this pharmacy'
+      });
+    }
+
+    // Check if stock is sufficient for typical order
+    const minOrderQuantity = 1;
+    const isAvailable = inventory.quantity >= minOrderQuantity;
+
+    res.json({
+      success: true,
+      available: isAvailable,
+      quantity: inventory.quantity,
+      price: inventory.price,
+      medicine: {
+        id: drug._id,
+        name: drug.name,
+        description: drug.description
+      },
+      pharmacyStock: {
+        batchNumber: inventory.batchNumber,
+        expiryDate: inventory.expiryDate,
+        daysUntilExpiry: inventory.daysUntilExpiry
+      }
+    });
+
+  } catch (error) {
+    console.error('Error checking medicine availability:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check availability'
+    });
+  }
+});
+
 module.exports = router;
