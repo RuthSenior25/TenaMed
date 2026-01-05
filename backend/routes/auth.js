@@ -452,21 +452,88 @@ router.patch('/pharmacy/:id/status', authenticate, authorize('admin'), async (re
   }
 });
 
-// Get approved pharmacies
+// Get approved pharmacies with location filtering
 router.get('/approved-pharmacies', async (req, res) => {
   try {
     console.log('Fetching approved pharmacies...'); // Debug log
-    const approvedPharmacies = await User.find({ 
+    
+    const { 
+      lat, 
+      lng, 
+      radius = 10, // Default 10km radius
+      city 
+    } = req.query;
+    
+    let query = { 
       role: 'pharmacy', 
       status: 'approved',
       isActive: true 
-    }).select('email profile pharmacyName');
+    };
+    
+    // If location coordinates are provided, add geospatial filtering
+    if (lat && lng) {
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
+      const searchRadius = parseFloat(radius) || 10;
+      
+      // Find pharmacies within radius (simplified distance calculation)
+      query['pharmacyLocation.coordinates.lat'] = {
+        $gte: userLat - (searchRadius / 111), // Approximate degrees
+        $lte: userLat + (searchRadius / 111)
+      };
+      query['pharmacyLocation.coordinates.lng'] = {
+        $gte: userLng - (searchRadius / (111 * Math.cos(userLat * Math.PI / 180))),
+        $lte: userLng + (searchRadius / (111 * Math.cos(userLat * Math.PI / 180)))
+      };
+    } else if (city) {
+      // Filter by city if no coordinates provided
+      query['pharmacyLocation.city'] = { 
+        $regex: city, 
+        $options: 'i' 
+      };
+    }
+    
+    const approvedPharmacies = await User.find(query)
+      .select('email profile pharmacyName pharmacyLocation')
+      .sort({ 'pharmacyLocation.city': 1 });
 
     console.log('Found approved pharmacies:', approvedPharmacies.length); // Debug log
 
+    // Calculate distances if coordinates provided
+    const pharmaciesWithDistance = approvedPharmacies.map(pharmacy => {
+      const pharmacyData = pharmacy.toObject();
+      
+      if (lat && lng && pharmacy.pharmacyLocation?.coordinates?.lat && pharmacy.pharmacyLocation?.coordinates?.lng) {
+        // Calculate distance using Haversine formula
+        const userLat = parseFloat(lat);
+        const userLng = parseFloat(lng);
+        const pharmLat = pharmacy.pharmacyLocation.coordinates.lat;
+        const pharmLng = pharmacy.pharmacyLocation.coordinates.lng;
+        
+        const R = 6371; // Earth's radius in km
+        const dLat = (pharmLat - userLat) * Math.PI / 180;
+        const dLon = (pharmLng - userLng) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(userLat * Math.PI / 180) * Math.cos(pharmLat * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+        
+        pharmacyData.distance = Math.round(distance * 10) / 10; // Round to 1 decimal
+        pharmacyData.distanceUnit = 'km';
+      }
+      
+      return pharmacyData;
+    });
+
     res.json({
       success: true,
-      pharmacies: approvedPharmacies
+      pharmacies: pharmaciesWithDistance,
+      searchCriteria: {
+        location: lat && lng ? { lat, lng, radius: `${radius}km` } : null,
+        city: city || null
+      }
     });
   } catch (error) {
     console.error('Error fetching approved pharmacies:', error);

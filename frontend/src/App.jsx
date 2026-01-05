@@ -466,6 +466,12 @@ const [orderForm, setOrderForm] = useState({
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
+const [userLocation, setUserLocation] = useState(null);
+const [locationFilter, setLocationFilter] = useState({
+  enabled: false,
+  city: '',
+  radius: 10
+});
 const [prescriptions, setPrescriptions] = useState([
 { id: 'RX-1023', drug: 'Amoxicillin 500mg', dosage: '2x / day', frequency: 'Morning & Night', refills: 1 },
 { id: 'RX-0991', drug: 'Metformin 850mg', dosage: '1x / day', frequency: 'Evening', refills: 3 },
@@ -512,6 +518,29 @@ const statCards = [
 { label: 'Nearby Pharmacies', value: 'Find Now', isAction: true, action: () => setActivePanel('pharmacies') },
 ];
 
+// Get user's current location
+const getUserLocation = () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        // Fallback to city-based filtering
+        setLocationFilter(prev => ({ ...prev, enabled: true }));
+      }
+    );
+  } else {
+    console.log('Geolocation not supported');
+    // Fallback to city-based filtering
+    setLocationFilter(prev => ({ ...prev, enabled: true }));
+  }
+};
+
 useEffect(() => {
 const fetchApprovedPharmacies = async () => {
   try {
@@ -519,7 +548,19 @@ const fetchApprovedPharmacies = async () => {
     const token = localStorage.getItem('token');
     console.log('Token found:', token ? 'Yes' : 'No'); // Debug log
     
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`, {
+    // Build query parameters for location-based filtering
+    let queryParams = new URLSearchParams();
+    if (userLocation) {
+      queryParams.append('lat', userLocation.lat);
+      queryParams.append('lng', userLocation.lng);
+      queryParams.append('radius', locationFilter.radius);
+    } else if (locationFilter.enabled && locationFilter.city) {
+      queryParams.append('city', locationFilter.city);
+    }
+    
+    const url = `${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    
+    const response = await fetch(url, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
@@ -544,7 +585,7 @@ const fetchApprovedPharmacies = async () => {
 
 fetchApprovedPharmacies();
 fetchDeliveries(); // Fetch real delivery data
-}, []);
+}, [userLocation, locationFilter]); // Re-fetch when location changes
 
 const recordAlert = (message) => setAlerts((prev) => [message, ...prev].slice(0, 4));
 
@@ -786,87 +827,193 @@ return <PharmacyLocator />;
 case 'approved-pharmacies':
 return (
 <div>
-<h3 style={{ fontSize: '18px', fontWeight: 600, color: '#2d3748', marginBottom: '16px' }}>
-Approved Pharmacies for Ordering
-</h3>
+<div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+  <h3 style={{ margin: '0 0 12px', color: '#1a365d' }}>📍 Find Nearby Pharmacies</h3>
+  
+  {/* Location Controls */}
+  <div style={{ marginBottom: '16px' }}>
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+      <button
+        onClick={getUserLocation}
+        style={{
+          padding: '8px 16px',
+          backgroundColor: userLocation ? '#10b981' : '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '14px'
+        }}
+      >
+        {userLocation ? '📍 Using My Location' : '📍 Use My Location'}
+      </button>
+      
+      <span style={{ color: '#718096' }}>OR</span>
+      
+      <button
+        onClick={() => setLocationFilter(prev => ({ ...prev, enabled: !prev.enabled }))}
+        style={{
+          padding: '8px 16px',
+          backgroundColor: locationFilter.enabled ? '#10b981' : '#6b7280',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontSize: '14px'
+        }}
+      >
+        {locationFilter.enabled ? '🏙️ Filter by City' : '🏙️ Filter by City'}
+      </button>
+    </div>
+    
+    {locationFilter.enabled && (
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Enter city name..."
+          value={locationFilter.city}
+          onChange={(e) => setLocationFilter(prev => ({ ...prev, city: e.target.value }))}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: '1px solid #cbd5e0',
+            fontSize: '14px'
+          }}
+        />
+        
+        <select
+          value={locationFilter.radius}
+          onChange={(e) => setLocationFilter(prev => ({ ...prev, radius: parseInt(e.target.value) }))}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: '1px solid #cbd5e0',
+            fontSize: '14px'
+          }}
+        >
+          <option value={5}>5 km</option>
+          <option value={10}>10 km</option>
+          <option value={25}>25 km</option>
+          <option value={50}>50 km</option>
+        </select>
+      </div>
+    )}
+    
+    {userLocation && (
+      <div style={{ fontSize: '12px', color: '#059669', marginTop: '8px' }}>
+        📍 Using your location: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+      </div>
+    )}
+  </div>
+</div>
+
 {isLoadingPharmacies ? (
-<div style={{ textAlign: 'center', padding: '32px' }}>
-<div style={{
-width: '32px',
-height: '32px',
-border: '3px solid #e2e8f0',
-borderTop: '3px solid #3b82f6',
-borderRadius: '50%',
-animation: 'spin 1s linear infinite',
-margin: '0 auto 16px'
-}}></div>
-<p style={{ color: '#718096' }}>Loading approved pharmacies...</p>
-</div>
+  <div style={{ textAlign: 'center', padding: '40px' }}>
+    <div style={{ fontSize: '16px', color: '#718096' }}>Loading approved pharmacies...</div>
+  </div>
 ) : approvedPharmacies.length === 0 ? (
-<div style={{ textAlign: 'center', padding: '32px' }}>
-<p style={{ color: '#718096' }}>No approved pharmacies found.</p>
-</div>
+  <div style={{ textAlign: 'center', padding: '40px' }}>
+    <div style={{ fontSize: '16px', color: '#718096' }}>No approved pharmacies found</div>
+    <div style={{ fontSize: '14px', color: '#a0aec0', marginTop: '8px' }}>
+      {locationFilter.enabled 
+        ? `Try adjusting your city filter or expanding the search radius`
+        : 'Try enabling location-based search or check back later'
+      }
+    </div>
+  </div>
 ) : (
-<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-{approvedPharmacies.map((pharmacy) => (
-<div key={pharmacy._id} style={{
-border: '1px solid #e2e8f0',
-borderRadius: '12px',
-padding: '16px',
-backgroundColor: 'white'
-}}>
-<h4 style={{ fontSize: '16px', fontWeight: 600, color: '#2d3748', marginBottom: '8px' }}>
-{pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
-</h4>
-<div style={{ fontSize: '14px', color: '#718096', marginBottom: '12px' }}>
-<p style={{ margin: '4px 0' }}><strong>Pharmacist:</strong> {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}</p>
-<p style={{ margin: '4px 0' }}><strong>Email:</strong> {pharmacy.email}</p>
-<p style={{ margin: '4px 0' }}><strong>Phone:</strong> {pharmacy.profile?.phone || 'Not provided'}</p>
-<p style={{ margin: '4px 0' }}><strong>Address:</strong> {pharmacy.profile?.address || 'Not provided'}</p>
-</div>
-<div style={{ marginBottom: '12px' }}>
-<span style={{
-display: 'inline-flex',
-alignItems: 'center',
-padding: '2px 8px',
-borderRadius: '9999px',
-fontSize: '12px',
-fontWeight: '500',
-backgroundColor: '#d1fae5',
-color: '#065f46'
-}}>
-Approved
-</span>
-</div>
-<button
-onClick={() => {
-  setSelectedPharmacy(pharmacy);
-  setShowOrderModal(true);
-}}
-style={{
-width: '100%',
-padding: '8px 16px',
-backgroundColor: '#3b82f6',
-color: 'white',
-border: 'none',
-borderRadius: '8px',
-cursor: 'pointer',
-fontSize: '14px',
-fontWeight: '500'
-}}
->
-Place Order
-</button>
-</div>
-))}
-</div>
+  <div style={{ display: 'grid', gap: '16px' }}>
+    {approvedPharmacies.map((pharmacy) => (
+      <div key={pharmacy._id} style={{
+        padding: '20px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        backgroundColor: 'white',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 4px', color: '#1a365d', fontSize: '18px' }}>
+              {pharmacy.pharmacyName || `${pharmacy.profile?.firstName} ${pharmacy.profile?.lastName}'s Pharmacy`}
+            </h4>
+            <p style={{ margin: '0', color: '#718096', fontSize: '14px' }}>
+              {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}
+            </p>
+            <p style={{ margin: '4px 0 0', color: '#4a5568', fontSize: '13px' }}>
+              📧 {pharmacy.email}
+            </p>
+            
+            {/* Location Information */}
+            {pharmacy.pharmacyLocation && (
+              <div style={{ marginTop: '8px', fontSize: '13px', color: '#2d3748' }}>
+                <div style={{ marginBottom: '4px' }}>
+                  📍 {pharmacy.pharmacyLocation.address}
+                </div>
+                <div style={{ marginBottom: '4px' }}>
+                  🏙️ {pharmacy.pharmacyLocation.city}, {pharmacy.pharmacyLocation.kebele}
+                </div>
+                {pharmacy.pharmacyLocation.postalCode && (
+                  <div style={{ marginBottom: '4px' }}>
+                    📮 {pharmacy.pharmacyLocation.postalCode}
+                  </div>
+                )}
+                {pharmacy.distance && (
+                  <div style={{ 
+                    marginBottom: '4px',
+                    padding: '4px 8px',
+                    backgroundColor: '#e0f2fe',
+                    borderRadius: '4px',
+                    color: '#1e40af',
+                    fontWeight: '600',
+                    display: 'inline-block'
+                  }}>
+                    🚶 {pharmacy.distance} {pharmacy.distanceUnit} away
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <div style={{ textAlign: 'right' }}>
+            <span style={{
+              padding: '4px 8px',
+              borderRadius: '9999px',
+              fontSize: '12px',
+              fontWeight: '500',
+              backgroundColor: '#d1fae5',
+              color: '#065f46'
+            }}>
+              Approved
+            </span>
+          </div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              setSelectedPharmacy(pharmacy);
+              setShowOrderModal(true);
+            }}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Place Order
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
 )}
-<style jsx>{`
-@keyframes spin {
-0% { transform: rotate(0deg); }
-100% { transform: rotate(360deg); }
-}
-`}</style>
 </div>
 );
 case 'prescriptions':

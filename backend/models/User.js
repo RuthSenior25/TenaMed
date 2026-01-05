@@ -42,6 +42,17 @@ const userSchema = new mongoose.Schema({
       return this.role === 'pharmacy';
     }
   },
+  // Pharmacy location fields
+  pharmacyLocation: {
+    address: { type: String },
+    city: { type: String },
+    kebele: { type: String },
+    postalCode: { type: String },
+    coordinates: {
+      lat: { type: Number },
+      lng: { type: Number }
+    }
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
