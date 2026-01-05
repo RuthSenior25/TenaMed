@@ -95,13 +95,30 @@ export const authAPI = {
   login: async (credentials) => {
     try {
       console.log('Attempting login with URL:', `${getBaseUrl()}/auth/login`);
+      console.log('Login attempt:', credentials.email);
 
-      // Check against hardcoded accounts first
+      // Proceed with normal login first (backend)
+      const response = await api.post('/auth/login', credentials);
+      console.log('Login response:', response.data);
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      return { success: true, data: response.data };
+      
+    } catch (error) {
+      console.error('Backend login failed, checking hardcoded accounts:', error.message);
+      
+      // Check against hardcoded accounts as fallback
       const hardcodedUser = Object.values(HARDCODED_ACCOUNTS).find(
         acc => acc.email === credentials.email && acc.password === credentials.password
       );
 
       if (hardcodedUser) {
+        console.log('Using hardcoded account for:', hardcodedUser.role);
         localStorage.setItem('token', `hardcoded-token-${hardcodedUser.role}`);
         localStorage.setItem('user', JSON.stringify(hardcodedUser.user));
         return { 
@@ -112,25 +129,8 @@ export const authAPI = {
           }
         };
       }
-
-      // Proceed with normal login if not a hardcoded account
-      const response = await api.post('/auth/login', credentials);
-      console.log('Login response:', response.data);
       
-      if (response.data.status === 'success' || response.data.token) {
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-        if (response.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-        } else if (response.data.result) {
-          localStorage.setItem('user', JSON.stringify(response.data.result));
-        }
-        return { success: true, data: response.data };
-      } else {
-        throw new Error(response.data.message || 'Login failed');
-      }
-    } catch (error) {
+      // If both fail, throw the original error
       console.error('Login API error:', {
         message: error.message,
         response: error.response?.data,
