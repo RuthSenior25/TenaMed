@@ -401,11 +401,13 @@ router.get('/nearby', async (req, res) => {
     const searchRadius = parseFloat(radius) || 10;
     const searchLimit = parseInt(limit) || 20;
 
-    // Find pharmacies within radius (simplified distance calculation)
+    console.log('Searching nearby pharmacies:', { userLat, userLng, searchRadius });
+
+    // First try to find pharmacies with location data
     const latRange = searchRadius / 111; // Approximate degrees
     const lngRange = searchRadius / (111 * Math.cos(userLat * Math.PI / 180));
 
-    const pharmacies = await User.find({
+    let pharmacies = await User.find({
       role: 'pharmacy',
       status: 'approved',
       isActive: true,
@@ -420,12 +422,25 @@ router.get('/nearby', async (req, res) => {
     }).select('email profile pharmacyName pharmacyLocation operatingHours')
     .limit(searchLimit);
 
+    console.log('Found pharmacies with location:', pharmacies.length);
+
+    // If no pharmacies with location data, fallback to all approved pharmacies
+    if (pharmacies.length === 0) {
+      console.log('No pharmacies with location found, fetching all approved pharmacies...');
+      pharmacies = await User.find({
+        role: 'pharmacy',
+        status: 'approved',
+        isActive: true
+      }).select('email profile pharmacyName pharmacyLocation operatingHours')
+      .limit(searchLimit);
+    }
+
     // Calculate distances and format response
     const pharmaciesWithDistance = pharmacies.map(pharmacy => {
       const pharmacyData = pharmacy.toObject();
       
+      // Calculate distance if location data exists
       if (pharmacy.pharmacyLocation?.coordinates?.lat && pharmacy.pharmacyLocation?.coordinates?.lng) {
-        // Calculate distance using Haversine formula
         const pharmLat = pharmacy.pharmacyLocation.coordinates.lat;
         const pharmLng = pharmacy.pharmacyLocation.coordinates.lng;
         
@@ -444,19 +459,35 @@ router.get('/nearby', async (req, res) => {
           coordinates: [pharmacy.pharmacyLocation.coordinates.lng, pharmacy.pharmacyLocation.coordinates.lat]
         };
         pharmacyData.address = {
-          street: pharmacy.pharmacyLocation.address,
-          city: pharmacy.pharmacyLocation.city,
-          kebele: pharmacy.pharmacyLocation.kebele,
-          postalCode: pharmacy.pharmacyLocation.postalCode
+          street: pharmacy.pharmacyLocation.address || 'Not specified',
+          city: pharmacy.pharmacyLocation.city || 'Not specified',
+          kebele: pharmacy.pharmacyLocation.kebele || 'Not specified',
+          postalCode: pharmacy.pharmacyLocation.postalCode || 'Not specified'
         };
-        pharmacyData.phone = pharmacy.profile?.phone;
+      } else {
+        // Set default values for pharmacies without location data
+        pharmacyData.distance = null;
+        pharmacyData.location = null;
+        pharmacyData.address = {
+          street: 'Not specified',
+          city: 'Not specified',
+          kebele: 'Not specified',
+          postalCode: 'Not specified'
+        };
       }
+      
+      pharmacyData.phone = pharmacy.profile?.phone || 'Not specified';
       
       return pharmacyData;
     });
 
-    // Sort by distance
-    pharmaciesWithDistance.sort((a, b) => a.distance - b.distance);
+    // Sort by distance (put null distances at the end)
+    pharmaciesWithDistance.sort((a, b) => {
+      if (a.distance === null && b.distance === null) return 0;
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
 
     res.json({
       success: true,
