@@ -14,8 +14,12 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
 
-  // Get user's current location
+  // Get user's current location and fetch all pharmacies
   useEffect(() => {
+    // First, fetch all pharmacies by default
+    fetchAllPharmacies();
+    
+    // Then try to get user location for additional filtering
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -23,21 +27,16 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });
-          fetchNearbyPharmacies(position.coords.latitude, position.coords.longitude);
+          // Only fetch nearby pharmacies if user explicitly enables location filter
+          // fetchNearbyPharmacies(position.coords.latitude, position.coords.longitude);
         },
         (error) => {
           console.error('Error getting location:', error);
-          setLocationError('Unable to retrieve your location. Please enable location services.');
-          setLoading(false);
-          // Fallback to fetching all pharmacies if location is not available
-          fetchAllPharmacies();
+          setLocationError('Unable to retrieve your location. Showing all pharmacies instead.');
         }
       );
     } else {
-      setLocationError('Geolocation is not supported by your browser');
-      setLoading(false);
-      // Fallback to fetching all pharmacies
-      fetchAllPharmacies();
+      setLocationError('Geolocation is not supported by your browser. Showing all pharmacies.');
     }
   }, []);
 
@@ -69,6 +68,8 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
     } catch (error) {
       console.error('Error fetching nearby pharmacies:', error);
       toast.error('Failed to load nearby pharmacies');
+      // Fallback to all pharmacies if nearby search fails
+      fetchAllPharmacies();
     } finally {
       setLoading(false);
     }
@@ -77,8 +78,8 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
   const fetchAllPharmacies = async () => {
     try {
       setLoading(true);
-      const response = await pharmaciesAPI.getAllPharmacies({ limit: 20 });
-      setPharmacies(response.data.pharmacies);
+      const response = await pharmaciesAPI.getAllPharmacies({ limit: 50 });
+      setPharmacies(response.data.pharmacies || []);
     } catch (error) {
       console.error('Error fetching all pharmacies:', error);
       toast.error('Failed to load pharmacies');
@@ -102,6 +103,20 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
           toast.error('Unable to refresh location');
         }
       );
+    }
+  };
+
+  const handleToggleLocationFilter = () => {
+    if (userLocation) {
+      if (filter === 'all') {
+        setFilter('nearby');
+        fetchNearbyPharmacies(userLocation.lat, userLocation.lng);
+      } else {
+        setFilter('all');
+        fetchAllPharmacies();
+      }
+    } else {
+      toast.error('Location not available. Please enable location services.');
     }
   };
 
@@ -139,26 +154,48 @@ const PharmacyLocator = ({ onOrderFromPharmacy }) => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, color: '#1a365d', fontSize: '18px' }}>
-            📍 Nearby Pharmacies
+            📍 {filter === 'nearby' ? 'Nearby Pharmacies' : 'All Pharmacies'}
           </h3>
-          <button
-            onClick={handleRefreshLocation}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <ArrowPathIcon style={{ width: '16px', height: '16px' }} />
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {userLocation && (
+              <button
+                onClick={handleToggleLocationFilter}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: filter === 'nearby' ? '#10b981' : '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <MapPinIcon style={{ width: '16px', height: '16px' }} />
+                {filter === 'nearby' ? 'Show All' : 'Nearby Only'}
+              </button>
+            )}
+            <button
+              onClick={handleRefreshLocation}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ArrowPathIcon style={{ width: '16px', height: '16px' }} />
+              Refresh
+            </button>
+          </div>
         </div>
         
         {userLocation && (

@@ -472,18 +472,9 @@ const [locationFilter, setLocationFilter] = useState({
   city: '',
   radius: 10
 });
-const [prescriptions, setPrescriptions] = useState([
-{ id: 'RX-1023', drug: 'Amoxicillin 500mg', dosage: '2x / day', frequency: 'Morning & Night', refills: 1 },
-{ id: 'RX-0991', drug: 'Metformin 850mg', dosage: '1x / day', frequency: 'Evening', refills: 3 },
-]);
-const [orders, setOrders] = useState([
-{ id: 'ORD-2011', medication: 'Insulin Pen', quantity: 3, notes: 'Rapid acting', status: 'Processing' },
-{ id: 'ORD-2010', medication: 'Vitamin D3', quantity: 1, notes: 'Chewable tablets', status: 'Delivered' },
-]);
-const [deliveries, setDeliveries] = useState([
-{ id: 'DLV-3001', courier: 'Yared', eta: 'Today • 6:00 PM', status: 'Out for delivery' },
-{ id: 'DLV-2999', courier: 'Hanna', eta: 'Yesterday • Delivered', status: 'Delivered' },
-]);
+const [prescriptions, setPrescriptions] = useState([]);
+const [orders, setOrders] = useState([]);
+const [deliveries, setDeliveries] = useState([]);
 const [alerts, setAlerts] = useState([]);
 const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '', notes: '' });
 const [catalogQuery, setCatalogQuery] = useState('');
@@ -541,6 +532,78 @@ const getUserLocation = () => {
   }
 };
 
+// Fetch prescriptions from backend
+const fetchPrescriptions = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/prescriptions`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (data.success) {
+      setPrescriptions(data.prescriptions || []);
+    }
+  } catch (error) {
+    console.error('Error fetching prescriptions:', error);
+  }
+};
+
+// Fetch orders from backend
+const fetchOrders = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (data.success) {
+      setOrders(data.data || []);
+    }
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+  }
+};
+
+// Fetch deliveries from backend
+const fetchDeliveries = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (data.success) {
+      // Convert orders to delivery format for display
+      const deliveryData = (data.data || []).map(order => ({
+        id: order._id,
+        medication: order.medications ? order.medications.map(med => med.name).join(', ') : 'Order',
+        quantity: order.medications ? order.medications.reduce((sum, med) => sum + med.quantity, 0) : 1,
+        courier: order.assignedDriver ? order.assignedDriver.name : 'Pending Assignment',
+        eta: order.deliveryStatus === 'delivered' ? 'Delivered' : 
+               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
+        status: order.deliveryStatus === 'delivered' ? 'Delivered' : 
+               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
+        createdAt: order.createdAt,
+        pharmacy: order.pharmacyId?.pharmacyName || 'Unknown Pharmacy'
+      }));
+      setDeliveries(deliveryData);
+    }
+  } catch (error) {
+    console.error('Error fetching deliveries:', error);
+  }
+};
+
 useEffect(() => {
 const fetchApprovedPharmacies = async () => {
   try {
@@ -548,9 +611,9 @@ const fetchApprovedPharmacies = async () => {
     const token = localStorage.getItem('token');
     console.log('Token found:', token ? 'Yes' : 'No'); // Debug log
     
-    // Build query parameters for location-based filtering
+    // Build query parameters for location-based filtering (only if location filter is enabled)
     let queryParams = new URLSearchParams();
-    if (userLocation) {
+    if (locationFilter.enabled && userLocation) {
       queryParams.append('lat', userLocation.lat);
       queryParams.append('lng', userLocation.lng);
       queryParams.append('radius', locationFilter.radius);
@@ -584,7 +647,9 @@ const fetchApprovedPharmacies = async () => {
 };
 
 fetchApprovedPharmacies();
-fetchDeliveries(); // Fetch real delivery data
+fetchPrescriptions();
+fetchOrders();
+fetchDeliveries();
 }, [userLocation, locationFilter]); // Re-fetch when location changes
 
 const recordAlert = (message) => setAlerts((prev) => [message, ...prev].slice(0, 4));
@@ -700,41 +765,6 @@ const handleOrderSubmit = async (event) => {
   } catch (error) {
     console.error('Error submitting order:', error);
     alert('Failed to submit order. Please try again.');
-  }
-};
-
-// Fetch real delivery data
-const fetchDeliveries = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-orders`, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : ''
-      }
-    });
-    
-    const data = await response.json();
-    if (data.success) {
-      // Convert orders to delivery format for display
-      const deliveryData = data.data.map(order => ({
-        id: order._id,
-        medication: order.medications.map(med => med.name).join(', '),
-        quantity: order.medications.reduce((sum, med) => sum + med.quantity, 0),
-        courier: order.assignedDriver ? 'Assigned Driver' : 'Pending Assignment',
-        eta: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
-               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
-        status: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
-               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
-        createdAt: order.createdAt,
-        pharmacy: order.pharmacyId?.pharmacyName
-      }));
-      
-      setDeliveries(deliveryData);
-    }
-  } catch (error) {
-    console.error('Error fetching deliveries:', error);
   }
 };
 
@@ -1064,236 +1094,114 @@ return (
 case 'prescriptions':
 return (
 <div style={{ display: 'grid', gap: '18px' }}>
-<form onSubmit={handleCatalogSearch} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<div style={{ display: 'grid', gap: '12px' }}>
-<div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px' }}>
-<input
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Search catalog (e.g. Ibuprofen)"
-value={catalogQuery}
-onChange={(e) => setCatalogQuery(e.target.value)}
-/>
-<button type="submit" style={{ ...buttonBaseStyle, background: '#2563eb' }}>Search</button>
-<button type="button" style={{ ...buttonBaseStyle, background: '#4a5568' }} onClick={handleResetCatalog}>
-Reset
-</button>
-</div>
-<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px' }}>
-<input
-type="number"
-min="0"
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Min price"
-value={filterInputs.minPrice}
-onChange={(e) => handleFilterInputChange('minPrice', e.target.value)}
-/>
-<input
-type="number"
-min="0"
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Max price"
-value={filterInputs.maxPrice}
-onChange={(e) => handleFilterInputChange('maxPrice', e.target.value)}
-/>
-<select
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-value={filterInputs.availability}
-onChange={(e) => handleFilterInputChange('availability', e.target.value)}
->
-<option value="any">Any availability</option>
-<option value="in_stock">In stock</option>
-<option value="low_stock">Low stock</option>
-<option value="pre_order">Pre-order</option>
-</select>
-<input
-type="number"
-min="1"
-max="5"
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Min rating"
-value={filterInputs.minRating}
-onChange={(e) => handleFilterInputChange('minRating', e.target.value)}
-/>
-</div>
-</div>
-</form>
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-<div>
-<strong style={{ color: '#1f2937' }}>Available Medicines</strong>
-<p style={{ margin: 0, fontSize: '12px', color: '#718096' }}>
-Showing filters: {catalogFilter || 'all names'}, price {appliedFilters.minPrice || 0} –
-{appliedFilters.maxPrice || '∞'}, availability {appliedFilters.availability}, rating ≥
-{appliedFilters.minRating || '0'}
-</p>
-</div>
-<span style={{ fontSize: '12px', color: '#718096' }}>{filteredMedicines.length} result(s)</span>
-</div>
-<div style={{ display: 'grid', gap: '14px' }}>
-{filteredMedicines.map((med) => (
-<div key={med.id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '12px', display: 'grid', gap: '6px' }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<div>
-<div style={{ fontWeight: 600, color: '#2d3748' }}>{med.name}</div>
-<p style={{ margin: 0, fontSize: '13px', color: '#4a5568' }}>{med.description}</p>
-<p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>
-{med.stock} • Avg price {med.averagePrice} birr • Rating {med.averageRating.toFixed(1)}
-</p>
-</div>
-<div style={{ display: 'flex', gap: '6px' }}>
-<button style={{ ...buttonBaseStyle, background: '#0f9d58' }} onClick={() => handleSelectMedicine(med)}>
-Order
-</button>
-<button style={{ ...buttonBaseStyle, background: '#9333ea' }} onClick={() => handleCompareMedicine(med)}>
-Compare
-</button>
-</div>
-</div>
-<div style={{ fontSize: '12px', color: '#4a5568', borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
-Usage: {med.instructions.timing} • Interval: {med.instructions.interval} • Precautions: {med.instructions.precautions}
-</div>
-</div>
-))}
-{filteredMedicines.length === 0 && (
-<p style={{ margin: 0, fontSize: '13px', color: '#a0aec0' }}>No matches—try another search.</p>
-)}
-</div>
-</div>
-{selectedMedicine && (
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-<div>
-<strong style={{ color: '#1f2937' }}>Price comparison</strong>
-<p style={{ margin: 0, fontSize: '12px', color: '#718096' }}>Pharmacies carrying {selectedMedicine.name}</p>
-</div>
-<button style={{ ...buttonBaseStyle, background: '#9b2c2c' }} onClick={() => setSelectedMedicine(null)}>
-Close
-</button>
-</div>
-<div style={{ display: 'grid', gap: '10px' }}>
-{selectedMedicine.pharmacies.map((pharmacy) => (
-<div key={pharmacy.name} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<div>
-<div style={{ fontWeight: 600, color: '#2d3748' }}>{pharmacy.name}</div>
-<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{pharmacy.location}</p>
-<p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>Rating {pharmacy.rating.toFixed(1)} / 5</p>
-</div>
-<div style={{ textAlign: 'right' }}>
-<div style={{ fontSize: '18px', fontWeight: 700, color: '#1a365d' }}>{pharmacy.price} birr</div>
-<button
-style={{ ...buttonBaseStyle, background: '#0f9d58', marginTop: '6px' }}
-onClick={() => {
-setOrderForm((prev) => ({ ...prev, medication: `${selectedMedicine.name} @ ${pharmacy.name}` }));
-recordAlert(`${selectedMedicine.name} from ${pharmacy.name} added to order form.`);
-setActivePanel('orders');
-}}
->
-Order here
-</button>
-</div>
-</div>
-))}
-</div>
-</div>
-)}
-<form onSubmit={handleOrderSubmit} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Order form</h4>
+<form onSubmit={handlePrescriptionSubmit} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Add Prescription</h4>
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
 <input
 style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
 placeholder="Medication name"
-value={orderForm.medication}
-onChange={(e) => setOrderForm((prev) => ({ ...prev, medication: e.target.value }))}
-/>
-<input
-type="number"
-min="1"
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Quantity"
-value={orderForm.quantity}
-onChange={(e) => setOrderForm((prev) => ({ ...prev, quantity: e.target.value }))}
+value={prescriptionForm.drug}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, drug: e.target.value }))}
 />
 <input
 style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Instructions / notes"
-value={orderForm.instructions}
-onChange={(e) => setOrderForm((prev) => ({ ...prev, instructions: e.target.value }))}
+placeholder="Dosage (e.g., 500mg)"
+value={prescriptionForm.dosage}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, dosage: e.target.value }))}
+/>
+<input
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+placeholder="Frequency (e.g., 2x daily)"
+value={prescriptionForm.frequency}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, frequency: e.target.value }))}
 />
 </div>
-<button type="submit" style={{ ...buttonBaseStyle, background: '#38a169' }}>Submit Order</button>
+<textarea
+style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', minHeight: '80px', marginBottom: '12px' }}
+placeholder="Additional notes..."
+value={prescriptionForm.notes}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, notes: e.target.value }))}
+/>
+<button type="submit" style={{ ...buttonBaseStyle, background: '#38a169' }}>Add Prescription</button>
 </form>
+
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Recent orders</h4>
-{orders.map((order) => (
-<div key={order.id} style={{ padding: '12px', borderRadius: '12px', border: '1px solid #edf2f7', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Your Prescriptions</h4>
+{prescriptions.length === 0 ? (
+<p style={{ margin: 0, color: '#a0aec0' }}>No prescriptions yet.</p>
+) : (
+<div style={{ display: 'grid', gap: '12px' }}>
+{prescriptions.map((prescription) => (
+<div key={prescription.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 <div>
-<div style={{ fontWeight: 600 }}>{order.medication}</div>
-<p style={{ margin: 0, color: '#4a5568' }}>Qty {order.quantity}</p>
-<p style={{ margin: 0, color: '#4a5568' }}>{order.notes || 'No special instructions'}</p>
+<div style={{ fontWeight: 600, color: '#2d3748' }}>{prescription.drug}</div>
+<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{prescription.dosage} • {prescription.frequency}</p>
+{prescription.notes && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>{prescription.notes}</p>}
 </div>
+<div style={{ display: 'flex', gap: '8px' }}>
+<button style={{ ...buttonBaseStyle, background: '#2563eb' }} onClick={() => setActivePanel('medicines')}>
+Order Medicine
+</button>
+<button style={{ ...buttonBaseStyle, background: '#f59e0b' }}>
+Request Refill
+</button>
+</div>
+</div>
+))}
+</div>
+)}
+</div>
+</div>
+);
+case 'orders':
+return (
+<div style={{ display: 'grid', gap: '18px' }}>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Your Orders</h4>
+{orders.length === 0 ? (
+<p style={{ margin: 0, color: '#a0aec0' }}>No orders yet.</p>
+) : (
+<div style={{ display: 'grid', gap: '12px' }}>
+{orders.map((order) => (
+<div key={order.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+<div>
+<div style={{ fontWeight: 600, color: '#2d3748' }}>
+{order.medications ? order.medications.map(med => med.name).join(', ') : order.medication || 'Order'}
+</div>
+<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>
+{order.medications ? `${order.medications.length} medication(s)` : `Qty ${order.quantity || 1}`}
+</p>
+{order.notes && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>{order.notes}</p>}
+{order.totalAmount && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#2d3748' }}>Total: {order.totalAmount} ETB</p>}
+</div>
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
 <span
 style={{
 padding: '6px 12px',
 borderRadius: '999px',
-background: order.status === 'Delivered' ? '#c6f6d5' : '#fefcbf',
-color: order.status === 'Delivered' ? '#22543d' : '#744210',
+background: order.status === 'Delivered' ? '#c6f6d5' : order.status === 'Processing' ? '#fefcbf' : '#e0e7ff',
+color: order.status === 'Delivered' ? '#22543d' : order.status === 'Processing' ? '#744210' : '#3730a3',
 fontSize: '12px',
 fontWeight: 600,
 }}
 >
 {order.status}
 </span>
+{order.status !== 'Delivered' && (
+<button style={{ ...buttonBaseStyle, background: '#ef4444', fontSize: '12px', padding: '4px 8px' }}>
+Cancel Order
+</button>
+)}
+{order.status === 'Delivered' && (
+<button style={{ ...buttonBaseStyle, background: '#3b82f6', fontSize: '12px', padding: '4px 8px' }}>
+Reorder
+</button>
+)}
 </div>
-))}
-{orders.length === 0 && <p style={{ margin: 0, color: '#a0aec0' }}>No orders yet.</p>}
-</div>
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Rate & review a pharmacy</h4>
-<form onSubmit={handleReviewSubmit} style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
-<select
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-value={reviewForm.pharmacy}
-onChange={(e) => setReviewForm((prev) => ({ ...prev, pharmacy: e.target.value }))}
->
-<option value="">Select pharmacy</option>
-{pharmacyOptions.map((name) => (
-<option key={name} value={name}>
-{name}
-</option>
-))}
-</select>
-<select
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-value={reviewForm.rating}
-onChange={(e) => setReviewForm((prev) => ({ ...prev, rating: e.target.value }))}
->
-{[5, 4, 3, 2, 1].map((star) => (
-<option key={star} value={star}>
-{star} star{star > 1 ? 's' : ''}
-</option>
-))}
-</select>
-<textarea
-rows={3}
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', resize: 'vertical' }}
-placeholder="Share your experience"
-value={reviewForm.comment}
-onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
-/>
-<button type="submit" style={{ ...buttonBaseStyle, background: '#2563eb' }}>Submit review</button>
-</form>
-<div style={{ display: 'grid', gap: '10px', maxHeight: '200px', overflowY: 'auto' }}>
-{reviews.map((review) => (
-<div key={review.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '10px' }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<strong style={{ color: '#2d3748' }}>{review.pharmacy}</strong>
-<span style={{ color: '#f59e0b', fontWeight: 600 }}>{'★'.repeat(review.rating)}</span>
-</div>
-<p style={{ margin: '4px 0', color: '#4a5568' }}>{review.comment}</p>
-<p style={{ margin: 0, fontSize: '12px', color: '#a0aec0' }}>{review.date}</p>
 </div>
 ))}
 </div>
+)}
 </div>
 </div>
 );
