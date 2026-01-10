@@ -485,7 +485,7 @@ const [deliveries, setDeliveries] = useState([
 { id: 'DLV-2999', courier: 'Hanna', eta: 'Yesterday • Delivered', status: 'Delivered' },
 ]);
 const [alerts, setAlerts] = useState([]);
-const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '' });
+const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '', notes: '' });
 const [catalogQuery, setCatalogQuery] = useState('');
 const [catalogFilter, setCatalogFilter] = useState('');
 const createFilterShape = () => ({
@@ -619,43 +619,88 @@ setAppliedFilters(nextFilters);
 setSelectedMedicine(null);
 };
 
-const handlePrescriptionSubmit = (event) => {
-event.preventDefault();
-if (!prescriptionForm.drug.trim() || !prescriptionForm.dosage.trim()) return;
-const newRx = {
-id: `RX-${Math.floor(Math.random() * 9000 + 1000)}`,
-...prescriptionForm,
-refills: 0,
-};
-setPrescriptions((prev) => [newRx, ...prev]);
-setPrescriptionForm({ drug: '', dosage: '', frequency: '' });
-setActivePanel('prescriptions');
-recordAlert(`${newRx.drug} saved to prescriptions.`);
+const handlePrescriptionSubmit = async (event) => {
+  event.preventDefault();
+  if (!prescriptionForm.drug.trim() || !prescriptionForm.dosage.trim()) return;
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/prescriptions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        drug: prescriptionForm.drug.trim(),
+        dosage: prescriptionForm.dosage.trim(),
+        frequency: prescriptionForm.frequency.trim(),
+        notes: prescriptionForm.notes || ''
+      })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      // Refresh prescriptions list
+      await fetchPrescriptions();
+      setPrescriptionForm({ drug: '', dosage: '', frequency: '', notes: '' });
+      setActivePanel('prescriptions');
+      recordAlert(`${prescriptionForm.drug} prescription added successfully.`);
+    } else {
+      recordAlert('Failed to add prescription: ' + (data.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error submitting prescription:', error);
+    recordAlert('Failed to add prescription. Please try again.');
+  }
 };
 
-const handleOrderSubmit = (event) => {
-event.preventDefault();
-if (!orderForm.medications[0].name.trim()) return;
-const newOrder = {
-id: `ORD-${Math.floor(Math.random() * 9000 + 2000)}`,
-medication: orderForm.medications[0].name.trim(),
-quantity: Number(orderForm.medications[0].quantity) || 1,
-notes: orderForm.medications[0].instructions.trim(),
-status: 'Draft',
-};
-setOrders((prev) => [newOrder, ...prev]);
-setOrderForm({
-  medications: [{ name: '', quantity: 1, instructions: '' }],
-  deliveryAddress: {
-    street: '',
-    city: '',
-    kebele: '',
-    postalCode: ''
-  },
-  notes: ''
-});
-setActivePanel('orders');
-recordAlert(`Draft order ${newOrder.id} created.`);
+const handleOrderSubmit = async (event) => {
+  event.preventDefault();
+  if (!orderForm.medications[0].name.trim()) return;
+  
+  try {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    const orderData = {
+      pharmacyId: selectedPharmacy?._id,
+      medications: orderForm.medications.filter(med => med.name.trim()),
+      deliveryAddress: orderForm.deliveryAddress,
+      notes: orderForm.notes,
+      totalAmount: orderForm.medications.reduce((sum, med) => sum + (med.quantity * 100), 0) // Simple calculation
+    };
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('Order submitted successfully! The pharmacy will prepare your order.');
+      setShowOrderModal(false);
+      setSelectedPharmacy(null);
+      setOrderForm({
+        medications: [{ name: '', quantity: 1, instructions: '' }],
+        deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+        notes: ''
+      });
+      // Refresh orders list
+      await fetchOrders();
+      setActivePanel('orders');
+    } else {
+      alert('Failed to submit order: ' + (data.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error submitting order:', error);
+    alert('Failed to submit order. Please try again.');
+  }
 };
 
 // Fetch real delivery data
