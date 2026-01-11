@@ -455,14 +455,13 @@ const [showOrderModal, setShowOrderModal] = useState(false);
 const [selectedPharmacy, setSelectedPharmacy] = useState(null);
 const [orderForm, setOrderForm] = useState({
   medications: [{ name: '', quantity: 1, instructions: '' }],
-  deliveryAddress: {
-    street: '',
-    city: '',
-    kebele: '',
-    postalCode: ''
-  },
+  deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
   notes: ''
 });
+const [showPaymentModal, setShowPaymentModal] = useState(false);
+const [pendingOrder, setPendingOrder] = useState(null);
+const [paymentMethod, setPaymentMethod] = useState('cash');
+const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
@@ -803,24 +802,73 @@ const handleOrderSubmit = async (event) => {
     console.log('Order submission response:', data);
     
     if (data.success) {
-      alert('Order submitted successfully! The pharmacy will prepare your order.');
+      // Instead of directly submitting, show payment modal first
+      setPendingOrder(orderData);
       setShowOrderModal(false);
-      setSelectedPharmacy(null);
+      setShowPaymentModal(true);
+    } else {
+      alert(`Failed to prepare order: ${data.message || data.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error submitting order:', error);
+    alert('Failed to submit order. Please try again.');
+  }
+};
+
+// Process payment
+const handlePayment = async () => {
+  if (!pendingOrder) return;
+  
+  try {
+    setIsProcessingPayment(true);
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay for realism
+    
+    // Add payment info to order
+    const orderWithPayment = {
+      ...pendingOrder,
+      paymentMethod: paymentMethod,
+      paymentStatus: 'paid',
+      paidAt: new Date().toISOString(),
+      transactionId: `TXN-${Date.now()}`
+    };
+    
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderWithPayment)
+    });
+
+    const data = await response.json();
+    console.log('Order with payment response:', data);
+    
+    if (data.success) {
+      alert(`Payment successful! Order #${data.data._id?.slice(-8) || 'placed'} has been submitted to ${pendingOrder.pharmacyName}.`);
+      setShowPaymentModal(false);
+      setPendingOrder(null);
       setOrderForm({
         medications: [{ name: '', quantity: 1, instructions: '' }],
         deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
         notes: ''
       });
       setAvailabilityResults({});
+      setPaymentMethod('cash');
       
       // Refresh orders
       fetchOrders();
     } else {
-      alert(`Failed to submit order: ${data.message || data.error || 'Unknown error'}`);
+      alert(`Payment failed: ${data.message || data.error || 'Unknown error'}`);
     }
   } catch (error) {
-    console.error('Error submitting order:', error);
-    alert('Failed to submit order. Please try again.');
+    console.error('Error processing payment:', error);
+    alert('Payment processing failed. Please try again.');
+  } finally {
+    setIsProcessingPayment(false);
   }
 };
 
