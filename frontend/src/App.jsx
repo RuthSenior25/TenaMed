@@ -462,6 +462,10 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
 const [pendingOrder, setPendingOrder] = useState(null);
 const [paymentMethod, setPaymentMethod] = useState('cash');
 const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+const [medicineSearchQuery, setMedicineSearchQuery] = useState('');
+const [medicineSearchResults, setMedicineSearchResults] = useState([]);
+const [showPriceComparison, setShowPriceComparison] = useState(false);
+const [selectedMedicineForComparison, setSelectedMedicineForComparison] = useState(null);
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
@@ -671,6 +675,80 @@ fetchPrescriptions();
 fetchOrders();
 fetchDeliveries();
 }, [userLocation, locationFilter]); // Re-fetch when location changes
+
+// Search for medicine across pharmacies
+const searchMedicineAcrossPharmacies = async (medicineName) => {
+  if (!medicineName.trim()) {
+    setMedicineSearchResults([]);
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const results = [];
+    
+    // Search in each approved pharmacy
+    for (const pharmacy of approvedPharmacies) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify({
+            pharmacyId: pharmacy._id,
+            medicineName: medicineName.trim()
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            // Calculate distance if user location is available
+            let distance = null;
+            if (userLocation && pharmacy.pharmacyLocation) {
+              const R = 6371; // Earth's radius in km
+              const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
+              const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
+              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              distance = R * c;
+            }
+
+            results.push({
+              pharmacyId: pharmacy._id,
+              pharmacyName: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+              pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
+              pharmacyCity: pharmacy.pharmacyLocation?.city || '',
+              distance: distance,
+              medicineName: data.medicine || medicineName,
+              price: data.price || 0,
+              quantity: data.quantity || 0,
+              availability: data.quantity > 0 ? 'in_stock' : 'out_of_stock'
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error searching in ${pharmacy.pharmacyName}:`, error);
+      }
+    }
+
+    // Sort by price, then by distance
+    results.sort((a, b) => {
+      if (a.price !== b.price) return a.price - b.price;
+      if (a.distance !== b.distance) return a.distance - b.distance;
+      return 0;
+    });
+
+    setMedicineSearchResults(results);
+  } catch (error) {
+    console.error('Error searching medicine:', error);
+    setMedicineSearchResults([]);
+  }
+};
 
 const recordAlert = (message) => setAlerts((prev) => [message, ...prev].slice(0, 4));
 
@@ -1067,12 +1145,50 @@ recordAlert(`Review submitted for ${newReview.pharmacy}.`);
 const renderPanelContent = () => {
 switch (activePanel) {
 case 'pharmacies':
-return <PharmacyLocator />;
-case 'approved-pharmacies':
 return (
 <div>
 <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
   <h3 style={{ margin: '0 0 12px', color: '#1a365d' }}>📍 Find Nearby Pharmacies</h3>
+  
+  {/* Medicine Search */}
+  <div style={{ marginBottom: '16px' }}>
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <input
+        type="text"
+        placeholder="Search for medicines (e.g., Amoxicillin)..."
+        value={medicineSearchQuery}
+        onChange={(e) => {
+          setMedicineSearchQuery(e.target.value);
+          searchMedicineAcrossPharmacies(e.target.value);
+        }}
+        style={{
+          flex: 1,
+          padding: '10px 12px',
+          borderRadius: '6px',
+          border: '1px solid #cbd5e0',
+          fontSize: '14px'
+        }}
+      />
+      {medicineSearchQuery && (
+        <button
+          onClick={() => {
+            setMedicineSearchQuery('');
+            setMedicineSearchResults([]);
+          }}
+          style={{
+            padding: '10px',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  </div>
   
   {/* Location Controls */}
   <div style={{ marginBottom: '16px' }}>
@@ -1152,6 +1268,98 @@ return (
   </div>
 </div>
 
+{/* Medicine Search Results */}
+{medicineSearchResults.length > 0 && (
+  <div style={{ marginBottom: '24px' }}>
+    <h4 style={{ margin: '0 0 16px', color: '#1a365d' }}>
+      💊 Price Comparison for "{medicineSearchQuery}"
+    </h4>
+    <div style={{ display: 'grid', gap: '12px' }}>
+      {medicineSearchResults.map((result, index) => (
+        <div key={index} style={{
+          padding: '16px',
+          border: '1px solid #e2e8f0',
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+            <div>
+              <h5 style={{ margin: '0 0 4px', color: '#1a365d', fontSize: '16px' }}>
+                {result.pharmacyName}
+              </h5>
+              <p style={{ margin: '0', color: '#6b7280', fontSize: '14px' }}>
+                📍 {result.pharmacyAddress}, {result.pharmacyCity}
+              </p>
+              {result.distance !== null && (
+                <div style={{
+                  display: 'inline-block',
+                  marginTop: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}>
+                  🚶 {result.distance.toFixed(1)} km away
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#059669' }}>
+                ETB {result.price}
+              </div>
+              <div style={{ 
+                fontSize: '12px', 
+                color: result.availability === 'in_stock' ? '#059669' : '#dc2626',
+                fontWeight: '600'
+              }}>
+                {result.availability === 'in_stock' ? '✓ In Stock' : '✗ Out of Stock'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                {result.quantity} units available
+              </div>
+            </div>
+          </div>
+          {result.availability === 'in_stock' && (
+            <button
+              onClick={() => {
+                const pharmacy = approvedPharmacies.find(p => p._id === result.pharmacyId);
+                if (pharmacy) {
+                  setSelectedPharmacy(pharmacy);
+                  setOrderForm(prev => ({
+                    ...prev,
+                    medications: [{ 
+                      name: result.medicineName, 
+                      quantity: 1, 
+                      instructions: '' 
+                    }]
+                  }));
+                  setShowOrderModal(true);
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Order from this Pharmacy
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 {isLoadingPharmacies ? (
   <div style={{ textAlign: 'center', padding: '40px' }}>
     <div style={{ fontSize: '16px', color: '#718096' }}>Loading approved pharmacies...</div>
@@ -1167,95 +1375,117 @@ return (
     </div>
   </div>
 ) : (
-  <div style={{ display: 'grid', gap: '16px' }}>
-    {approvedPharmacies.map((pharmacy) => (
-      <div key={pharmacy._id} style={{
-        padding: '20px',
-        border: '1px solid #e2e8f0',
-        borderRadius: '12px',
-        backgroundColor: 'white',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-          <div>
-            <h4 style={{ margin: '0 0 4px', color: '#1a365d', fontSize: '18px' }}>
-              {pharmacy.pharmacyName || `${pharmacy.profile?.firstName} ${pharmacy.profile?.lastName}'s Pharmacy`}
-            </h4>
-            <p style={{ margin: '0', color: '#718096', fontSize: '14px' }}>
-              {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}
-            </p>
-            <p style={{ margin: '4px 0 0', color: '#4a5568', fontSize: '13px' }}>
-              📧 {pharmacy.email}
-            </p>
-            
-            {/* Location Information */}
-            {pharmacy.pharmacyLocation && (
-              <div style={{ marginTop: '8px', fontSize: '13px', color: '#2d3748' }}>
-                <div style={{ marginBottom: '4px' }}>
-                  📍 {pharmacy.pharmacyLocation.address}
-                </div>
-                <div style={{ marginBottom: '4px' }}>
-                  🏙️ {pharmacy.pharmacyLocation.city}, {pharmacy.pharmacyLocation.kebele}
-                </div>
-                {pharmacy.pharmacyLocation.postalCode && (
-                  <div style={{ marginBottom: '4px' }}>
-                    📮 {pharmacy.pharmacyLocation.postalCode}
-                  </div>
-                )}
-                {pharmacy.distance && (
-                  <div style={{ 
-                    marginBottom: '4px',
-                    padding: '4px 8px',
-                    backgroundColor: '#e0f2fe',
-                    borderRadius: '4px',
-                    color: '#1e40af',
-                    fontWeight: '600',
-                    display: 'inline-block'
-                  }}>
-                    🚶 {pharmacy.distance} {pharmacy.distanceUnit} away
+  <div>
+    {!medicineSearchQuery && (
+      <h4 style={{ margin: '0 0 16px', color: '#1a365d' }}>
+        🏥 Approved Pharmacies Near You
+      </h4>
+    )}
+    <div style={{ display: 'grid', gap: '16px' }}>
+      {approvedPharmacies.map((pharmacy) => {
+        // Calculate distance if user location is available
+        let distance = null;
+        if (userLocation && pharmacy.pharmacyLocation) {
+          const R = 6371; // Earth's radius in km
+          const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
+          const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          distance = R * c;
+        }
+
+        return (
+          <div key={pharmacy._id} style={{
+            padding: '20px',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            backgroundColor: 'white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px', color: '#1a365d', fontSize: '18px' }}>
+                  {pharmacy.pharmacyName || `${pharmacy.profile?.firstName} ${pharmacy.profile?.lastName}'s Pharmacy`}
+                </h4>
+                <p style={{ margin: '0', color: '#718096', fontSize: '14px' }}>
+                  {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}
+                </p>
+                <p style={{ margin: '4px 0 0', color: '#4a5568', fontSize: '13px' }}>
+                  📧 {pharmacy.email}
+                </p>
+                
+                {/* Location Information */}
+                {pharmacy.pharmacyLocation && (
+                  <div style={{ marginTop: '8px', fontSize: '13px', color: '#2d3748' }}>
+                    <div style={{ marginBottom: '4px' }}>
+                      📍 {pharmacy.pharmacyLocation.address}
+                    </div>
+                    <div style={{ marginBottom: '4px' }}>
+                      🏙️ {pharmacy.pharmacyLocation.city}, {pharmacy.pharmacyLocation.kebele}
+                    </div>
+                    {pharmacy.pharmacyLocation.postalCode && (
+                      <div style={{ marginBottom: '4px' }}>
+                        📮 {pharmacy.pharmacyLocation.postalCode}
+                      </div>
+                    )}
+                    {distance !== null && (
+                      <div style={{ 
+                        marginBottom: '4px',
+                        padding: '4px 8px',
+                        backgroundColor: '#dbeafe',
+                        borderRadius: '4px',
+                        color: '#1e40af',
+                        fontWeight: '600',
+                        display: 'inline-block'
+                      }}>
+                        🚶 {distance.toFixed(1)} km away
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
+              
+              <div style={{ textAlign: 'right' }}>
+                <span style={{
+                  padding: '4px 8px',
+                  borderRadius: '9999px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  backgroundColor: '#d1fae5',
+                  color: '#065f46'
+                }}>
+                  Approved
+                </span>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  setSelectedPharmacy(pharmacy);
+                  setShowOrderModal(true);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Place Order
+              </button>
+            </div>
           </div>
-          
-          <div style={{ textAlign: 'right' }}>
-            <span style={{
-              padding: '4px 8px',
-              borderRadius: '9999px',
-              fontSize: '12px',
-              fontWeight: '500',
-              backgroundColor: '#d1fae5',
-              color: '#065f46'
-            }}>
-              Approved
-            </span>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button
-            onClick={() => {
-              setSelectedPharmacy(pharmacy);
-              setShowOrderModal(true);
-            }}
-            style={{
-              flex: 1,
-              padding: '10px 16px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            Place Order
-          </button>
-        </div>
-      </div>
-    ))}
+        );
+      })}
+    </div>
   </div>
 )}
 </div>
