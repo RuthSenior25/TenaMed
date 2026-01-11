@@ -1385,15 +1385,35 @@ return (
       {approvedPharmacies.map((pharmacy) => {
         // Calculate distance if user location is available
         let distance = null;
+        
+        // Debug logging
+        console.log('Pharmacy data:', {
+          id: pharmacy._id,
+          name: pharmacy.pharmacyName,
+          location: pharmacy.pharmacyLocation,
+          userLocation: userLocation
+        });
+        
         if (userLocation && pharmacy.pharmacyLocation) {
-          const R = 6371; // Earth's radius in km
-          const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
-          const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
-          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          distance = R * c;
+          // Try different possible coordinate field names
+          const pharmacyLat = pharmacy.pharmacyLocation.lat || pharmacy.pharmacyLocation.latitude;
+          const pharmacyLng = pharmacy.pharmacyLocation.lng || pharmacy.pharmacyLocation.longitude;
+          
+          if (pharmacyLat && pharmacyLng) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (pharmacyLat - userLocation.lat) * Math.PI / 180;
+            const dLon = (pharmacyLng - userLocation.lng) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            distance = R * c;
+            
+            console.log('Distance calculated:', {
+              pharmacy: pharmacy.pharmacyName,
+              distance: distance.toFixed(1)
+            });
+          }
         }
 
         return (
@@ -1405,10 +1425,38 @@ return (
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-              <div>
-                <h4 style={{ margin: '0 0 4px', color: '#1a365d', fontSize: '18px' }}>
-                  {pharmacy.pharmacyName || `${pharmacy.profile?.firstName} ${pharmacy.profile?.lastName}'s Pharmacy`}
-                </h4>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <h4 style={{ margin: '0', color: '#1a365d', fontSize: '18px' }}>
+                    {pharmacy.pharmacyName || `${pharmacy.profile?.firstName} ${pharmacy.profile?.lastName}'s Pharmacy`}
+                  </h4>
+                  {distance !== null && (
+                    <div style={{ 
+                      padding: '4px 8px',
+                      backgroundColor: '#dbeafe',
+                      color: '#1e40af',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      🚶 {distance.toFixed(1)} km away
+                    </div>
+                  )}
+                  {!userLocation && (
+                    <div style={{ 
+                      padding: '4px 8px',
+                      backgroundColor: '#fef3c7',
+                      color: '#92400e',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      📍 Enable location to see distance
+                    </div>
+                  )}
+                </div>
                 <p style={{ margin: '0', color: '#718096', fontSize: '14px' }}>
                   {pharmacy.profile?.firstName} {pharmacy.profile?.lastName}
                 </p>
@@ -1430,19 +1478,7 @@ return (
                         📮 {pharmacy.pharmacyLocation.postalCode}
                       </div>
                     )}
-                    {distance !== null && (
-                      <div style={{ 
-                        marginBottom: '4px',
-                        padding: '4px 8px',
-                        backgroundColor: '#dbeafe',
-                        borderRadius: '4px',
-                        color: '#1e40af',
-                        fontWeight: '600',
-                        display: 'inline-block'
-                      }}>
-                        🚶 {distance.toFixed(1)} km away
-                      </div>
-                    )}
+                    {/* Distance already shown next to pharmacy name, so no duplicate here */}
                   </div>
                 )}
               </div>
