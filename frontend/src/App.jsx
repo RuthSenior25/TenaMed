@@ -476,6 +476,7 @@ const [prescriptions, setPrescriptions] = useState([]);
 const [orders, setOrders] = useState([]);
 const [deliveries, setDeliveries] = useState([]);
 const [alerts, setAlerts] = useState([]);
+const [patientProfile, setPatientProfile] = useState(null);
 const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '', notes: '' });
 const [catalogQuery, setCatalogQuery] = useState('');
 const [catalogFilter, setCatalogFilter] = useState('');
@@ -529,6 +530,25 @@ const getUserLocation = () => {
     console.log('Geolocation not supported');
     // Fallback to city-based filtering
     setLocationFilter(prev => ({ ...prev, enabled: true }));
+  }
+};
+
+// Fetch patient profile from backend
+const fetchPatientProfile = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/patient/profile`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (data.success) {
+      setPatientProfile(data.data);
+    }
+  } catch (error) {
+    console.error('Error fetching patient profile:', error);
   }
 };
 
@@ -647,6 +667,7 @@ const fetchApprovedPharmacies = async () => {
 };
 
 fetchApprovedPharmacies();
+fetchPatientProfile();
 fetchPrescriptions();
 fetchOrders();
 fetchDeliveries();
@@ -1228,6 +1249,50 @@ Mark Received
 ))}
 </div>
 );
+case 'profile':
+return (
+<div style={{ display: 'grid', gap: '18px' }}>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>My Profile</h4>
+{patientProfile ? (
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+<div>
+<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Personal Information</h5>
+<p><strong>Name:</strong> {patientProfile.profile?.firstName} {patientProfile.profile?.lastName}</p>
+<p><strong>Email:</strong> {patientProfile.email}</p>
+<p><strong>Phone:</strong> {patientProfile.profile?.phone}</p>
+<p><strong>Date of Birth:</strong> {patientProfile.profile?.dateOfBirth || 'Not set'}</p>
+<p><strong>Gender:</strong> {patientProfile.profile?.gender || 'Not set'}</p>
+</div>
+<div>
+<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Medical Information</h5>
+<p><strong>Blood Type:</strong> {patientProfile.profile?.medicalInfo?.bloodType || 'Not set'}</p>
+<p><strong>Allergies:</strong> {patientProfile.profile?.medicalInfo?.allergies?.join(', ') || 'None'}</p>
+<p><strong>Chronic Conditions:</strong> {patientProfile.profile?.medicalInfo?.chronicConditions?.join(', ') || 'None'}</p>
+</div>
+<div>
+<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Emergency Contact</h5>
+<p><strong>Name:</strong> {patientProfile.profile?.emergencyContact?.name || 'Not set'}</p>
+<p><strong>Phone:</strong> {patientProfile.profile?.emergencyContact?.phone || 'Not set'}</p>
+<p><strong>Relationship:</strong> {patientProfile.profile?.emergencyContact?.relationship || 'Not set'}</p>
+</div>
+<div>
+<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Addresses</h5>
+{patientProfile.profile?.addresses?.map((address, index) => (
+<div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
+<p style={{ margin: 0 }}><strong>{address.type}:</strong></p>
+<p style={{ margin: 0 }}>{address.street}, {address.city}</p>
+<p style={{ margin: 0 }}>{address.kebele}, {address.postalCode}</p>
+</div>
+))}
+</div>
+</div>
+) : (
+<p style={{ margin: 0, color: '#a0aec0' }}>Loading profile...</p>
+)}
+</div>
+</div>
+);
 default:
 return null;
 }
@@ -1292,6 +1357,13 @@ View Pharmacies
 <p style={cardBodyStyle}>Confirm when a courier drops off your package.</p>
 <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
 View Deliveries
+</button>
+</div>
+<div style={cardBaseStyle}>
+<h3 style={cardTitleStyle}>My Profile</h3>
+<p style={cardBodyStyle}>View and manage your personal and medical information.</p>
+<button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
+View Profile
 </button>
 </div>
 </div>
@@ -2903,6 +2975,498 @@ const DispatcherDashboard = () => {
   );
 };
 
+// Delivery Person Dashboard
+const DeliveryDashboard = () => {
+  const [assignedOrders, setAssignedOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [activePanel, setActivePanel] = useState('assignments');
+  const [isLoading, setIsLoading] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [analytics, setAnalytics] = useState({
+    todayDeliveries: 0,
+    weekDeliveries: 0,
+    monthDeliveries: 0,
+    averageRating: 0,
+    onTimeRate: 0
+  });
+
+  // Fetch delivery person data
+  useEffect(() => {
+    fetchProfile();
+    fetchAssignedOrders();
+    fetchCompletedOrders();
+    fetchAnalytics();
+    startLocationTracking();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/profile`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setProfile(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  const fetchAssignedOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/my-assignments`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAssignedOrders(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching assigned orders:', error);
+    }
+  };
+
+  const fetchCompletedOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/completed-orders`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCompletedOrders(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching completed orders:', error);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/analytics`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAnalytics(data.data || {});
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
+  };
+
+  const startLocationTracking = () => {
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error('Location tracking error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+      return watchId;
+    }
+  };
+
+  const acceptOrder = async (orderId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/accept-order/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAssignedOrders(prev => 
+          prev.map(order => 
+            order._id === orderId 
+              ? { ...order, status: 'accepted' }
+              : order
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      alert('Failed to accept order. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startDelivery = async (orderId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/start-delivery/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAssignedOrders(prev => 
+          prev.map(order => 
+            order._id === orderId 
+              ? { ...order, status: 'in_progress' }
+              : order
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error starting delivery:', error);
+      alert('Failed to start delivery. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeDelivery = async (orderId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/complete-delivery/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Move from assigned to completed
+        const completedOrder = assignedOrders.find(order => order._id === orderId);
+        if (completedOrder) {
+          setAssignedOrders(prev => prev.filter(order => order._id !== orderId));
+          setCompletedOrders(prev => [...prev, { ...completedOrder, status: 'completed', completedAt: new Date() }]);
+        }
+        fetchAnalytics(); // Refresh analytics
+      }
+    } catch (error) {
+      console.error('Error completing delivery:', error);
+      alert('Failed to complete delivery. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const buttonBaseStyle = {
+    padding: '8px 16px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease'
+  };
+
+  const cardBaseStyle = {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  };
+
+  const cardTitleStyle = {
+    margin: '0 0 8px',
+    color: '#1a365d',
+    fontSize: '18px',
+    fontWeight: '600'
+  };
+
+  const cardBodyStyle = {
+    margin: '0 0 16px',
+    color: '#718096',
+    fontSize: '14px'
+  };
+
+  const actionButtonStyle = (isActive, color) => ({
+    ...buttonBaseStyle,
+    backgroundColor: isActive ? color : '#f7fafc',
+    color: isActive ? 'white' : '#4a5568',
+    border: isActive ? 'none' : '1px solid #e2e8f0'
+  });
+
+  const renderPanelContent = () => {
+    switch (activePanel) {
+      case 'assignments':
+        return (
+          <div style={{ display: 'grid', gap: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Current Assignments</h3>
+            {assignedOrders.length === 0 ? (
+              <p style={{ margin: 0, color: '#a0aec0' }}>No assigned orders</p>
+            ) : (
+              assignedOrders.map((order) => (
+                <div key={order._id} style={cardBaseStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                        Order #{order._id.slice(-8)}
+                      </div>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#4a5568' }}>
+                        {order.medications ? order.medications.map(med => med.name).join(', ') : 'Medications'}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#4a5568' }}>
+                        📍 {order.deliveryAddress?.street}, {order.deliveryAddress?.city}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#4a5568' }}>
+                        💰 ETB {order.totalAmount || 0}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        backgroundColor: order.status === 'pending' ? '#fef3c7' : 
+                                       order.status === 'accepted' ? '#dbeafe' : 
+                                       order.status === 'in_progress' ? '#e0e7ff' : '#d1fae5',
+                        color: order.status === 'pending' ? '#92400e' : 
+                                order.status === 'accepted' ? '#1e40af' : 
+                                order.status === 'in_progress' ? '#3730a3' : '#065f46'
+                      }}>
+                        {order.status === 'pending' ? 'Pending' :
+                         order.status === 'accepted' ? 'Accepted' :
+                         order.status === 'in_progress' ? 'In Progress' : 'Completed'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    {order.status === 'pending' && (
+                      <button
+                        onClick={() => acceptOrder(order._id)}
+                        disabled={isLoading}
+                        style={{ ...buttonBaseStyle, background: '#10b981', opacity: isLoading ? 0.5 : 1 }}
+                      >
+                        {isLoading ? 'Accepting...' : 'Accept Order'}
+                      </button>
+                    )}
+                    {order.status === 'accepted' && (
+                      <button
+                        onClick={() => startDelivery(order._id)}
+                        disabled={isLoading}
+                        style={{ ...buttonBaseStyle, background: '#3b82f6', opacity: isLoading ? 0.5 : 1 }}
+                      >
+                        {isLoading ? 'Starting...' : 'Start Delivery'}
+                      </button>
+                    )}
+                    {order.status === 'in_progress' && (
+                      <button
+                        onClick={() => completeDelivery(order._id)}
+                        disabled={isLoading}
+                        style={{ ...buttonBaseStyle, background: '#059669', opacity: isLoading ? 0.5 : 1 }}
+                      >
+                        {isLoading ? 'Completing...' : 'Complete Delivery'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        );
+
+      case 'completed':
+        return (
+          <div style={{ display: 'grid', gap: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Completed Today</h3>
+            {completedOrders.length === 0 ? (
+              <p style={{ margin: 0, color: '#a0aec0' }}>No completed deliveries today</p>
+            ) : (
+              completedOrders.map((order) => (
+                <div key={order._id} style={cardBaseStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                        Order #{order._id.slice(-8)}
+                      </div>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#4a5568' }}>
+                        {order.medications ? order.medications.map(med => med.name).join(', ') : 'Medications'}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#4a5568' }}>
+                        📍 {order.deliveryAddress?.street}, {order.deliveryAddress?.city}
+                      </p>
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#059669' }}>
+                        ✅ Completed at {order.completedAt ? new Date(order.completedAt).toLocaleTimeString() : 'N/A'}
+                      </p>
+                    </div>
+                    <span style={{
+                      padding: '6px 12px',
+                      borderRadius: '999px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      backgroundColor: '#d1fae5',
+                      color: '#065f46'
+                    }}>
+                      Delivered
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        );
+
+      case 'profile':
+        return (
+          <div style={{ display: 'grid', gap: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>My Profile</h3>
+            {profile ? (
+              <div style={cardBaseStyle}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Personal Information</h4>
+                    <p><strong>Name:</strong> {profile.profile?.firstName} {profile.profile?.lastName}</p>
+                    <p><strong>Email:</strong> {profile.email}</p>
+                    <p><strong>Phone:</strong> {profile.profile?.phone}</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Vehicle Information</h4>
+                    <p><strong>Type:</strong> {profile.profile?.vehicleInfo?.type}</p>
+                    <p><strong>Plate:</strong> {profile.profile?.vehicleInfo?.plateNumber}</p>
+                    <p><strong>Model:</strong> {profile.profile?.vehicleInfo?.make} {profile.profile?.vehicleInfo?.model}</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Performance</h4>
+                    <p><strong>Total Deliveries:</strong> {profile.profile?.performance?.totalDeliveries || 0}</p>
+                    <p><strong>Average Rating:</strong> ⭐ {profile.profile?.performance?.averageRating || 0}</p>
+                    <p><strong>On-Time Rate:</strong> {profile.profile?.performance?.onTimeDeliveryRate || 0}%</p>
+                  </div>
+                </div>
+                {currentLocation && (
+                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '8px' }}>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e' }}>
+                      📍 Current Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: '#a0aec0' }}>Loading profile...</p>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
+              Delivery Dashboard
+            </h1>
+            <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>
+              Manage your deliveries and track your performance
+            </p>
+          </div>
+          <button 
+            onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}
+            style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }}
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* Analytics Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          <div style={cardBaseStyle}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>Today's Deliveries</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.todayDeliveries}</div>
+          </div>
+          <div style={cardBaseStyle}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>This Week</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.weekDeliveries}</div>
+          </div>
+          <div style={cardBaseStyle}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>This Month</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>{analytics.monthDeliveries}</div>
+          </div>
+          <div style={cardBaseStyle}>
+            <p style={{ margin: 0, color: '#718096', fontSize: '13px' }}>Average Rating</p>
+            <div style={{ fontSize: '28px', fontWeight: 700, color: '#1a365d' }}>⭐ {analytics.averageRating}</div>
+          </div>
+        </div>
+
+        {/* Navigation Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Current Assignments</h3>
+            <p style={cardBodyStyle}>View and manage your assigned orders</p>
+            <button style={actionButtonStyle(activePanel === 'assignments', '#4299e1')} onClick={() => setActivePanel('assignments')}>
+              View Assignments ({assignedOrders.length})
+            </button>
+          </div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Completed Today</h3>
+            <p style={cardBodyStyle}>See your completed deliveries for today</p>
+            <button style={actionButtonStyle(activePanel === 'completed', '#10b981')} onClick={() => setActivePanel('completed')}>
+              View Completed ({completedOrders.length})
+            </button>
+          </div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>My Profile</h3>
+            <p style={cardBodyStyle}>View and update your delivery profile</p>
+            <button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
+              View Profile
+            </button>
+          </div>
+        </div>
+
+        {/* Workspace */}
+        <div style={cardBaseStyle}>
+          <div>
+            <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
+            <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}</p>
+          </div>
+          {renderPanelContent()}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Role-based dashboard router
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -2987,8 +3551,8 @@ case 'patient':
 return <PatientDashboard />;
 case 'dispatcher':
 return <DispatcherDashboard />;
-case 'supplier':
-return <SupplierDashboard />;
+case 'delivery_person':
+return <DeliveryDashboard />;
 case 'government':
 return (
 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
