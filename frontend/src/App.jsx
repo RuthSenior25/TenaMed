@@ -743,19 +743,52 @@ const handlePrescriptionSubmit = async (event) => {
 
 const handleOrderSubmit = async (event) => {
   event.preventDefault();
-  if (!orderForm.medications[0].name.trim()) return;
+  
+  // Validate all medications have availability checked
+  const invalidMeds = orderForm.medications.filter((med, index) => 
+    med.name.trim() && (!availabilityResults[index] || !availabilityResults[index].success)
+  );
+  
+  if (invalidMeds.length > 0) {
+    alert('Please check availability for all medications before placing the order.');
+    return;
+  }
+  
+  if (!orderForm.medications.some(med => med.name.trim())) {
+    alert('Please add at least one medication.');
+    return;
+  }
   
   try {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     
+    // Calculate total amount based on availability results
+    const totalAmount = orderForm.medications.reduce((sum, med, index) => {
+      if (!med.name.trim() || !availabilityResults[index]?.success) return sum;
+      const price = availabilityResults[index].price || 0;
+      return sum + (med.quantity * price);
+    }, 0);
+    
     const orderData = {
       pharmacyId: selectedPharmacy?._id,
-      medications: orderForm.medications.filter(med => med.name.trim()),
+      pharmacyName: selectedPharmacy?.pharmacyName || `${selectedPharmacy?.profile?.firstName}'s Pharmacy`,
+      medications: orderForm.medications
+        .filter(med => med.name.trim())
+        .map((med, index) => ({
+          name: med.name,
+          quantity: med.quantity,
+          instructions: med.instructions,
+          price: availabilityResults[index]?.price || 0,
+          subtotal: med.quantity * (availabilityResults[index]?.price || 0)
+        })),
       deliveryAddress: orderForm.deliveryAddress,
       notes: orderForm.notes,
-      totalAmount: orderForm.medications.reduce((sum, med) => sum + (med.quantity * 100), 0) // Simple calculation
+      totalAmount: totalAmount,
+      orderDate: new Date().toISOString()
     };
+
+    console.log('Submitting order:', orderData);
 
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders`, {
       method: 'POST',
@@ -767,6 +800,7 @@ const handleOrderSubmit = async (event) => {
     });
 
     const data = await response.json();
+    console.log('Order submission response:', data);
     
     if (data.success) {
       alert('Order submitted successfully! The pharmacy will prepare your order.');
@@ -777,11 +811,12 @@ const handleOrderSubmit = async (event) => {
         deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
         notes: ''
       });
-      // Refresh orders list
-      await fetchOrders();
-      setActivePanel('orders');
+      setAvailabilityResults({});
+      
+      // Refresh orders
+      fetchOrders();
     } else {
-      alert('Failed to submit order: ' + (data.message || 'Unknown error'));
+      alert(`Failed to submit order: ${data.message || data.error || 'Unknown error'}`);
     }
   } catch (error) {
     console.error('Error submitting order:', error);
@@ -860,10 +895,18 @@ const checkMedicineAvailability = async (medicationName, medicationIndex) => {
   try {
     setCheckingAvailability(prev => ({ ...prev, [medicationIndex]: true }));
     
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
+    console.log('Checking availability for:', {
+      pharmacyId: selectedPharmacy._id,
+      pharmacyName: selectedPharmacy.pharmacyName,
+      medicineName: medicationName.trim()
+    });
+    
+    // Try primary endpoint first
+    let response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : ''
       },
       body: JSON.stringify({
         pharmacyId: selectedPharmacy._id,
@@ -871,17 +914,74 @@ const checkMedicineAvailability = async (medicationName, medicationIndex) => {
       })
     });
 
-    const data = await response.json();
+    console.log('Primary response status:', response.status);
+    let data = await response.json();
+    console.log('Primary availability response:', data);
     
-    setAvailabilityResults(prev => ({
-      ...prev,
-      [medicationIndex]: data
-    }));
+    // If primary endpoint fails, try alternative approach
+    if (!response.ok || !data.success) {
+      console.log('Primary endpoint failed, trying alternative...');
+      
+      // Try to get pharmacy inventory and search locally
+      response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/pharmacy/${selectedPharmacy._id}`, {
+        headers: {
+          'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : ''
+        }
+      });
+      
+      if (response.ok) {
+        const inventoryData = await response.json();
+        console.log('Pharmacy inventory:', inventoryData);
+        
+        // Search for medicine in inventory
+        const medicine = inventoryData.data?.inventory?.find(item => 
+          item.medicineName?.toLowerCase() === medicationName.trim().toLowerCase() ||
+          item.name?.toLowerCase() === medicationName.trim().toLowerCase()
+        );
+        
+        if (medicine) {
+          data = {
+            success: true,
+            quantity: medicine.quantity || medicine.stock || 0,
+            price: medicine.price || medicine.unitPrice || 0,
+            medicine: medicine.medicineName || medicine.name
+          };
+        } else {
+          data = {
+            success: false,
+            error: `${medicationName} not found in ${selectedPharmacy.pharmacyName}'s inventory`
+          };
+        }
+      }
+    }
+    
+    if (data.success) {
+      setAvailabilityResults(prev => ({
+        ...prev,
+        [medicationIndex]: {
+          success: true,
+          quantity: data.quantity || data.stock || 0,
+          price: data.price || data.unitPrice || 0,
+          medicine: data.medicine
+        }
+      }));
+    } else {
+      setAvailabilityResults(prev => ({
+        ...prev,
+        [medicationIndex]: { 
+          success: false, 
+          error: data.message || data.error || 'Medicine not found in this pharmacy inventory' 
+        }
+      }));
+    }
   } catch (error) {
     console.error('Error checking availability:', error);
     setAvailabilityResults(prev => ({
       ...prev,
-      [medicationIndex]: { success: false, error: 'Failed to check availability' }
+      [medicationIndex]: { 
+        success: false, 
+        error: 'Failed to check availability. Please try again.' 
+      }
     }));
   } finally {
     setCheckingAvailability(prev => ({ ...prev, [medicationIndex]: false }));
