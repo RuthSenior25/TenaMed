@@ -470,6 +470,7 @@ const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
 const [userLocation, setUserLocation] = useState(null);
+const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
 const [locationFilter, setLocationFilter] = useState({
   enabled: false,
   city: '',
@@ -534,6 +535,119 @@ const getUserLocation = () => {
     // Fallback to city-based filtering
     setLocationFilter(prev => ({ ...prev, enabled: true }));
   }
+};
+
+// Request location permission once and get user location
+const requestLocationPermissionOnce = () => {
+  const hasAsked = localStorage.getItem('locationPermissionAsked');
+  if (hasAsked || locationPermissionAsked) {
+    return; // Already asked, don't ask again
+  }
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setUserLocation(location);
+        localStorage.setItem('userLocation', JSON.stringify(location));
+        localStorage.setItem('locationPermissionAsked', 'true');
+        setLocationPermissionAsked(true);
+        
+        // Show success message
+        const successDiv = document.createElement('div');
+        successDiv.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #d1fae5;
+          border: 1px solid #10b981;
+          border-radius: 8px;
+          padding: 12px 16px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        `;
+        successDiv.innerHTML = `
+          <div style="font-size: 16px;">✅</div>
+          <div>
+            <div style="color: #065f46; font-size: 12px; font-weight: 600;">Location Found!</div>
+            <div style="color: #047857; font-size: 11px;">Showing nearby pharmacies with distances</div>
+          </div>
+        `;
+        
+        document.body.appendChild(successDiv);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+          if (document.body.contains(successDiv)) {
+            document.body.removeChild(successDiv);
+          }
+        }, 3000);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        localStorage.setItem('locationPermissionAsked', 'true');
+        setLocationPermissionAsked(true);
+        
+        // Show error message
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #fef2f2;
+          border: 1px solid #ef4444;
+          border-radius: 8px;
+          padding: 12px 16px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        `;
+        errorDiv.innerHTML = `
+          <div style="font-size: 16px;">❌</div>
+          <div>
+            <div style="color: #991b1b; font-size: 12px; font-weight: 600;">Location Access Denied</div>
+            <div style="color: #b91c1c; font-size: 11px;">Enable location in browser settings to see nearby pharmacies</div>
+          </div>
+        `;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+          if (document.body.contains(errorDiv)) {
+            document.body.removeChild(errorDiv);
+          }
+        }, 5000);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      }
+    );
+  } else {
+    console.log('Geolocation is not supported by your browser.');
+  }
+};
+
+// Calculate distance between two coordinates using Haversine formula
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 };
 
 // Fetch patient profile from backend
@@ -628,6 +742,9 @@ const fetchDeliveries = async () => {
 };
 
 useEffect(() => {
+  // Request location permission once on component mount
+  requestLocationPermissionOnce();
+
 const fetchApprovedPharmacies = async () => {
   try {
     setIsLoadingPharmacies(true);
@@ -1194,7 +1311,7 @@ return (
   <div style={{ marginBottom: '16px' }}>
     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
       <button
-        onClick={getUserLocation}
+        onClick={requestLocationPermissionOnce}
         style={{
           padding: '8px 16px',
           backgroundColor: userLocation ? '#10b981' : '#3b82f6',
@@ -1400,14 +1517,7 @@ return (
           const pharmacyLng = pharmacy.pharmacyLocation.lng || pharmacy.pharmacyLocation.longitude;
           
           if (pharmacyLat && pharmacyLng) {
-            const R = 6371; // Earth's radius in km
-            const dLat = (pharmacyLat - userLocation.lat) * Math.PI / 180;
-            const dLon = (pharmacyLng - userLocation.lng) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            distance = R * c;
+            distance = calculateDistance(userLocation.lat, userLocation.lng, pharmacyLat, pharmacyLng);
             
             console.log('Distance calculated:', {
               pharmacy: pharmacy.pharmacyName,
