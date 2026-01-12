@@ -471,6 +471,10 @@ const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
 const [userLocation, setUserLocation] = useState(null);
 const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
+const [showOrderTrackModal, setShowOrderTrackModal] = useState(false);
+const [orderTrackAction, setOrderTrackAction] = useState(''); // 'order' or 'track'
+const [globalMedicineSearch, setGlobalMedicineSearch] = useState('');
+const [globalMedicineResults, setGlobalMedicineResults] = useState([]);
 const [locationFilter, setLocationFilter] = useState({
   enabled: false,
   city: '',
@@ -741,10 +745,7 @@ const fetchDeliveries = async () => {
   }
 };
 
-useEffect(() => {
-  // Request location permission once on component mount
-  requestLocationPermissionOnce();
-
+// Fetch approved pharmacies from backend
 const fetchApprovedPharmacies = async () => {
   try {
     setIsLoadingPharmacies(true);
@@ -786,17 +787,21 @@ const fetchApprovedPharmacies = async () => {
   }
 };
 
-fetchApprovedPharmacies();
-fetchPatientProfile();
-fetchPrescriptions();
-fetchOrders();
-fetchDeliveries();
+useEffect(() => {
+  // Request location permission once on component mount
+  requestLocationPermissionOnce();
+
+  fetchApprovedPharmacies();
+  fetchPatientProfile();
+  fetchPrescriptions();
+  fetchOrders();
+  fetchDeliveries();
 }, [userLocation, locationFilter]); // Re-fetch when location changes
 
-// Search for medicine across pharmacies
-const searchMedicineAcrossPharmacies = async (medicineName) => {
+// Global medicine search function
+const searchGlobalMedicines = async (medicineName) => {
   if (!medicineName.trim()) {
-    setMedicineSearchResults([]);
+    setGlobalMedicineResults([]);
     return;
   }
 
@@ -860,10 +865,10 @@ const searchMedicineAcrossPharmacies = async (medicineName) => {
       return 0;
     });
 
-    setMedicineSearchResults(results);
+    setGlobalMedicineResults(results);
   } catch (error) {
     console.error('Error searching medicine:', error);
-    setMedicineSearchResults([]);
+    setGlobalMedicineResults([]);
   }
 };
 
@@ -1611,7 +1616,7 @@ return (
               <button
                 onClick={() => {
                   setSelectedPharmacy(pharmacy);
-                  setShowOrderModal(true);
+                  setShowOrderTrackModal(true);
                 }}
                 style={{
                   flex: 1,
@@ -1835,6 +1840,113 @@ Logout
 </button>
 </div>
 
+{/* Global Medicine Search */}
+<div style={{ marginBottom: '24px', padding: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+  <h3 style={{ margin: '0 0 16px', color: 'white', fontSize: '20px', fontWeight: '600' }}>🔍 Search for Medicines</h3>
+  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+    <input
+      type="text"
+      placeholder="Search for any medicine (e.g., Amoxicillin, Paracetamol)..."
+      value={globalMedicineSearch}
+      onChange={(e) => {
+        setGlobalMedicineSearch(e.target.value);
+        searchGlobalMedicines(e.target.value);
+      }}
+      style={{
+        flex: 1,
+        padding: '14px 18px',
+        borderRadius: '12px',
+        border: 'none',
+        fontSize: '16px',
+        background: 'rgba(255, 255, 255, 0.95)',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+        outline: 'none'
+      }}
+    />
+    {globalMedicineSearch && (
+      <button
+        onClick={() => {
+          setGlobalMedicineSearch('');
+          setGlobalMedicineResults([]);
+        }}
+        style={{
+          padding: '14px 18px',
+          background: 'rgba(255, 255, 255, 0.2)',
+          color: 'white',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: '12px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: '600',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        Clear
+      </button>
+    )}
+  </div>
+  
+  {/* Global Medicine Search Results */}
+  {globalMedicineResults.length > 0 && (
+    <div style={{ marginTop: '20px' }}>
+      <h4 style={{ margin: '0 0 12px', color: 'white', fontSize: '16px' }}>
+        💊 Found at {globalMedicineResults.length} Pharmacies
+      </h4>
+      <div style={{ display: 'grid', gap: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+        {globalMedicineResults.map((result, index) => (
+          <div key={index} style={{
+            padding: '16px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+              <div>
+                <h5 style={{ margin: '0 0 4px', color: '#2d3748', fontSize: '16px', fontWeight: '600' }}>
+                  {result.pharmacyName}
+                </h5>
+                <p style={{ margin: '0', color: '#718096', fontSize: '14px' }}>
+                  📍 {result.pharmacyAddress}, {result.pharmacyCity}
+                </p>
+                {result.distance !== null && (
+                  <div style={{
+                    display: 'inline-block',
+                    marginTop: '4px',
+                    padding: '4px 8px',
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    🚶 {result.distance.toFixed(1)} km away
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#059669' }}>
+                  ETB {result.price}
+                </div>
+                <div style={{ 
+                  fontSize: '12px', 
+                  color: result.quantity > 0 ? '#059669' : '#dc2626',
+                  fontWeight: '600'
+                }}>
+                  {result.quantity > 0 ? `✓ ${result.quantity} in stock` : '✗ Out of stock'}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: '14px', color: '#4a5568', fontWeight: '500' }}>
+              💊 {result.medicineName}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
+
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
 {statCards.map((stat) => (
 <div key={stat.label} style={{ ...cardBaseStyle, padding: '20px' }}>
@@ -1899,6 +2011,114 @@ View Profile
 </div>
 {renderPanelContent()}
 </div>
+
+{/* Order/Track Modal */}
+{showOrderTrackModal && selectedPharmacy && (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10000
+  }}>
+    <div style={{
+      backgroundColor: 'white',
+      borderRadius: '16px',
+      padding: '32px',
+      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+      maxWidth: '500px',
+      width: '100%'
+    }}>
+      <h3 style={{ margin: '0 0 24px', color: '#2d3748', fontSize: '24px', fontWeight: '700' }}>
+        What would you like to do?
+      </h3>
+      
+      <div style={{ marginBottom: '24px' }}>
+        <p style={{ margin: '0 0 16px', color: '#718096', fontSize: '16px' }}>
+          Choose an action for <strong>{selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}</strong>
+        </p>
+      </div>
+      
+      <div style={{ display: 'flex', gap: '16px', flexDirection: 'column' }}>
+        <button
+          onClick={() => {
+            setOrderTrackAction('order');
+            setShowOrderTrackModal(false);
+            setShowOrderModal(true);
+          }}
+          style={{
+            padding: '16px 24px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📦 Place Order
+        </button>
+        
+        <button
+          onClick={() => {
+            setOrderTrackAction('track');
+            setShowOrderTrackModal(false);
+            setActivePanel('orders');
+          }}
+          style={{
+            padding: '16px 24px',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📍 Track Order
+        </button>
+        
+        <button
+          onClick={() => {
+            setShowOrderTrackModal(false);
+            setSelectedPharmacy(null);
+            setOrderTrackAction('');
+          }}
+          style={{
+            padding: '16px 24px',
+            backgroundColor: '#6b7280',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 {/* Order Modal */}
 {showOrderModal && selectedPharmacy && (
