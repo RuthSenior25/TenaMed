@@ -796,10 +796,13 @@ useEffect(() => {
   fetchPrescriptions();
   fetchOrders();
   fetchDeliveries();
-}, [userLocation, locationFilter]); // Re-fetch when location changes
+}, [userLocation, locationFilter, approvedPharmacies]); // Re-fetch when location or pharmacies change
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
+  console.log('Searching for medicine:', medicineName);
+  console.log('Approved pharmacies available:', approvedPharmacies.length);
+  
   if (!medicineName.trim()) {
     setGlobalMedicineResults([]);
     return;
@@ -812,6 +815,7 @@ const searchGlobalMedicines = async (medicineName) => {
     // Search in each approved pharmacy
     for (const pharmacy of approvedPharmacies) {
       try {
+        console.log('Searching in pharmacy:', pharmacy.pharmacyName);
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
           method: 'POST',
           headers: {
@@ -824,8 +828,12 @@ const searchGlobalMedicines = async (medicineName) => {
           })
         });
 
+        console.log('Response status for', pharmacy.pharmacyName, ':', response.status);
+
         if (response.ok) {
           const data = await response.json();
+          console.log('Response data for', pharmacy.pharmacyName, ':', data);
+          
           if (data.success) {
             // Calculate distance if user location is available
             let distance = null;
@@ -851,12 +859,18 @@ const searchGlobalMedicines = async (medicineName) => {
               quantity: data.quantity || 0,
               availability: data.quantity > 0 ? 'in_stock' : 'out_of_stock'
             });
+            
+            console.log('Added result for', pharmacy.pharmacyName, ':', results[results.length - 1]);
           }
+        } else {
+          console.error('Failed response from', pharmacy.pharmacyName, ':', response.status, response.statusText);
         }
       } catch (error) {
         console.error(`Error searching in ${pharmacy.pharmacyName}:`, error);
       }
     }
+
+    console.log('Final results before sorting:', results);
 
     // Sort by price, then by distance
     results.sort((a, b) => {
@@ -865,9 +879,10 @@ const searchGlobalMedicines = async (medicineName) => {
       return 0;
     });
 
+    console.log('Final results after sorting:', results);
     setGlobalMedicineResults(results);
   } catch (error) {
-    console.error('Error searching medicine:', error);
+    console.error('Error in searchGlobalMedicines:', error);
     setGlobalMedicineResults([]);
   }
 };
