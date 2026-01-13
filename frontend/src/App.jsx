@@ -812,75 +812,126 @@ const searchGlobalMedicines = async (medicineName) => {
     const token = localStorage.getItem('token');
     const results = [];
     
-    // Search in each approved pharmacy
-    for (const pharmacy of approvedPharmacies) {
-      try {
-        console.log('Searching in pharmacy:', pharmacy.pharmacyName);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          },
-          body: JSON.stringify({
-            pharmacyId: pharmacy._id,
-            medicineName: medicineName.trim()
-          })
-        });
-
-        console.log('Response status for', pharmacy.pharmacyName, ':', response.status);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Response data for', pharmacy.pharmacyName, ':', data);
-          
-          if (data.success) {
-            // Calculate distance if user location is available
-            let distance = null;
-            if (userLocation && pharmacy.pharmacyLocation) {
-              const R = 6371; // Earth's radius in km
-              const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
-              const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
-              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-              distance = R * c;
-            }
-
-            results.push({
-              pharmacyId: pharmacy._id,
-              pharmacyName: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
-              pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
-              pharmacyCity: pharmacy.pharmacyLocation?.city || '',
-              distance: distance,
-              medicineName: data.medicine || medicineName,
-              price: data.price || 0,
-              quantity: data.quantity || 0,
-              availability: data.quantity > 0 ? 'in_stock' : 'out_of_stock'
-            });
-            
-            console.log('Added result for', pharmacy.pharmacyName, ':', results[results.length - 1]);
+    // Fallback: Use base medicine catalog if API fails
+    const fallbackResults = [];
+    const searchTerm = medicineName.trim().toLowerCase();
+    
+    // Search in base catalog first
+    for (const medicine of baseMedicineCatalog) {
+      if (medicine.name.toLowerCase().includes(searchTerm)) {
+        // Add this medicine from each pharmacy that has it
+        for (const pharmacy of approvedPharmacies) {
+          let distance = null;
+          if (userLocation && pharmacy.pharmacyLocation) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
+            const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            distance = R * c;
           }
-        } else {
-          console.error('Failed response from', pharmacy.pharmacyName, ':', response.status, response.statusText);
+
+          fallbackResults.push({
+            pharmacyId: pharmacy._id,
+            pharmacyName: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+            pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
+            pharmacyCity: pharmacy.pharmacyLocation?.city || '',
+            distance: distance,
+            medicineName: medicine.name,
+            price: medicine.averagePrice || 0,
+            quantity: 10, // Default quantity for catalog medicines
+            availability: 'in_stock', // Assume available from catalog
+            source: 'catalog' // Mark as fallback data
+          });
         }
-      } catch (error) {
-        console.error(`Error searching in ${pharmacy.pharmacyName}:`, error);
       }
     }
+    
+    console.log('Fallback results from catalog:', fallbackResults);
+    
+    // Try API search, but use fallback if it fails
+    let apiResults = [];
+    try {
+      // Search in each approved pharmacy via API
+      for (const pharmacy of approvedPharmacies) {
+        try {
+          console.log('Searching in pharmacy:', pharmacy.pharmacyName);
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/check-availability`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({
+              pharmacyId: pharmacy._id,
+              medicineName: medicineName.trim()
+            })
+          });
 
-    console.log('Final results before sorting:', results);
+          console.log('Response status for', pharmacy.pharmacyName, ':', response.status);
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Response data for', pharmacy.pharmacyName, ':', data);
+            
+            if (data.success) {
+              // Calculate distance if user location is available
+              let distance = null;
+              if (userLocation && pharmacy.pharmacyLocation) {
+                const R = 6371; // Earth's radius in km
+                const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
+                const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                          Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
+                          Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                distance = R * c;
+              }
+
+              apiResults.push({
+                pharmacyId: pharmacy._id,
+                pharmacyName: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+                pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
+                pharmacyCity: pharmacy.pharmacyLocation?.city || '',
+                distance: distance,
+                medicineName: data.medicine || medicineName,
+                price: data.price || 0,
+                quantity: data.quantity || 0,
+                availability: data.quantity > 0 ? 'in_stock' : 'out_of_stock',
+                source: 'api' // Mark as API data
+              });
+              
+              console.log('Added result for', pharmacy.pharmacyName, ':', apiResults[apiResults.length - 1]);
+            }
+          } else {
+            console.error('Failed response from', pharmacy.pharmacyName, ':', response.status, response.statusText);
+          }
+        } catch (error) {
+          console.error(`Error searching in ${pharmacy.pharmacyName}:`, error);
+        }
+      }
+    } catch (apiError) {
+      console.error('API search failed completely:', apiError);
+      // Use fallback results if API fails
+      apiResults = [];
+    }
+
+    // Use API results if available, otherwise use fallback
+    const finalResults = apiResults.length > 0 ? apiResults : fallbackResults;
+    
+    console.log('Final results before sorting:', finalResults);
 
     // Sort by price, then by distance
-    results.sort((a, b) => {
+    finalResults.sort((a, b) => {
       if (a.price !== b.price) return a.price - b.price;
       if (a.distance !== b.distance) return a.distance - b.distance;
       return 0;
     });
 
-    console.log('Final results after sorting:', results);
-    setGlobalMedicineResults(results);
+    console.log('Final results after sorting:', finalResults);
+    setGlobalMedicineResults(finalResults);
   } catch (error) {
     console.error('Error in searchGlobalMedicines:', error);
     setGlobalMedicineResults([]);
@@ -1950,6 +2001,20 @@ Logout
                 }}>
                   {result.quantity > 0 ? `✓ ${result.quantity} in stock` : '✗ Out of stock'}
                 </div>
+                {result.source === 'catalog' && (
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#f59e0b',
+                    fontWeight: '600',
+                    marginTop: '4px',
+                    padding: '2px 6px',
+                    backgroundColor: '#fef3c7',
+                    borderRadius: '4px',
+                    display: 'inline-block'
+                  }}>
+                    📋 Catalog Data
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ fontSize: '14px', color: '#4a5568', fontWeight: '500' }}>
