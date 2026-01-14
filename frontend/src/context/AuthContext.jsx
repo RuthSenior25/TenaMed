@@ -23,6 +23,38 @@ const GOVERNMENT_CREDENTIALS = {
   id: 'gov-001'
 };
 
+// Hardcoded patient credentials for testing
+const PATIENT_CREDENTIALS = {
+  email: 'patient@test.com',
+  password: 'patient123',
+  role: 'patient',
+  firstName: 'Test',
+  lastName: 'Patient',
+  id: 'patient-001'
+};
+
+// Hardcoded pharmacy credentials for testing
+const PHARMACY_CREDENTIALS = {
+  email: 'pharmacy@test.com',
+  password: 'pharmacy123',
+  role: 'pharmacy',
+  firstName: 'Test',
+  lastName: 'Pharmacy',
+  id: 'pharmacy-001',
+  pharmacyName: 'Test Pharmacy',
+  isApproved: true
+};
+
+// Hardcoded courier credentials for testing
+const COURIER_CREDENTIALS = {
+  email: 'courier@test.com',
+  password: 'courier123',
+  role: 'dispatcher',
+  firstName: 'Test',
+  lastName: 'Courier',
+  id: 'courier-001'
+};
+
 const AuthContext = createContext();
 
 const initialState = {
@@ -305,55 +337,149 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
       
-      // Regular user login
-      const response = await authAPI.login(credentials);
-      
-      if (!response.data || !response.data.token) {
-        throw new Error('Invalid response from server');
-      }
-      
-      const { user, token, expiresIn } = response.data;
-      
-      // Set up auto-logout timer if expiresIn is provided
-      if (expiresIn) {
-        setupLogoutTimer(expiresIn);
-      }
+      // Try regular user login with API first
+      try {
+        console.log('Attempting login with URL:', import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api/auth/login');
+        const response = await authAPI.login(credentials);
+        
+        if (!response.data || !response.data.token) {
+          throw new Error('Invalid response from server');
+        }
+        
+        const { user, token, expiresIn } = response.data;
+        
+        // Set up auto-logout timer if expiresIn is provided
+        if (expiresIn) {
+          setupLogoutTimer(expiresIn);
+        }
 
-      // Store the token in local storage
-      localStorage.setItem('token', token);
-      
-      // Update the axios instance with the new token
-      if (authAPI && authAPI.defaults && authAPI.defaults.headers) {
-        authAPI.defaults.headers.common = authAPI.defaults.headers.common || {};
-        authAPI.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        // Store the token in local storage
+        localStorage.setItem('token', token);
+        
+        // Update the axios instance with the new token
+        if (authAPI && authAPI.defaults && authAPI.defaults.headers) {
+          authAPI.defaults.headers.common = authAPI.defaults.headers.common || {};
+          authAPI.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Get the full user profile
+        const profileResponse = await authAPI.getProfile();
+        const userWithProfile = { ...user, ...(profileResponse?.data || {}) };
+
+        // Update the auth state
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: { 
+            user: userWithProfile, 
+            token 
+          },
+        });
+
+        // Customize welcome message based on user role
+        const roleMessages = {
+          government: 'Government Official',
+          pharmacy: 'Pharmacy Owner',
+          dispatcher: 'Delivery Person',
+          supplier: 'Medicine Supplier',
+          patient: 'Patient'
+        };
+        
+        const roleMessage = roleMessages[user.role] || '';
+        toast.success(`Welcome back, ${user.firstName || 'User'}! ${roleMessage ? `(${roleMessage})` : ''}`);
+        
+        return { success: true };
+      } catch (apiError) {
+        console.log('Backend login failed, checking hardcoded accounts:', apiError.message || 'Network error');
+        
+        // Check for hardcoded test accounts when API fails
+        if (credentials.email === PATIENT_CREDENTIALS.email && 
+            credentials.password === PATIENT_CREDENTIALS.password) {
+          
+          const patientUser = {
+            _id: PATIENT_CREDENTIALS.id,
+            email: PATIENT_CREDENTIALS.email,
+            role: PATIENT_CREDENTIALS.role,
+            firstName: PATIENT_CREDENTIALS.firstName,
+            lastName: PATIENT_CREDENTIALS.lastName,
+            isApproved: true,
+            status: 'active'
+          };
+          
+          const patientToken = 'patient-001';
+          
+          localStorage.setItem('token', patientToken);
+          localStorage.setItem('user', JSON.stringify(patientUser));
+          
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user: patientUser, token: patientToken },
+          });
+          
+          toast.success(`Welcome back, ${PATIENT_CREDENTIALS.firstName}! (Patient)`);
+          return { success: true };
+        }
+        
+        if (credentials.email === PHARMACY_CREDENTIALS.email && 
+            credentials.password === PHARMACY_CREDENTIALS.password) {
+          
+          const pharmacyUser = {
+            _id: PHARMACY_CREDENTIALS.id,
+            email: PHARMACY_CREDENTIALS.email,
+            role: PHARMACY_CREDENTIALS.role,
+            firstName: PHARMACY_CREDENTIALS.firstName,
+            lastName: PHARMACY_CREDENTIALS.lastName,
+            pharmacy: {
+              name: PHARMACY_CREDENTIALS.pharmacyName,
+              isApproved: PHARMACY_CREDENTIALS.isApproved
+            },
+            isApproved: PHARMACY_CREDENTIALS.isApproved,
+            status: 'active'
+          };
+          
+          const pharmacyToken = 'pharmacy-001';
+          
+          localStorage.setItem('token', pharmacyToken);
+          localStorage.setItem('user', JSON.stringify(pharmacyUser));
+          
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user: pharmacyUser, token: pharmacyToken },
+          });
+          
+          toast.success(`Welcome back, ${PHARMACY_CREDENTIALS.firstName}! (Pharmacy Owner)`);
+          return { success: true };
+        }
+        
+        if (credentials.email === COURIER_CREDENTIALS.email && 
+            credentials.password === COURIER_CREDENTIALS.password) {
+          
+          const courierUser = {
+            _id: COURIER_CREDENTIALS.id,
+            email: COURIER_CREDENTIALS.email,
+            role: COURIER_CREDENTIALS.role,
+            firstName: COURIER_CREDENTIALS.firstName,
+            lastName: COURIER_CREDENTIALS.lastName,
+            isApproved: true,
+            status: 'active'
+          };
+          
+          const courierToken = 'courier-001';
+          
+          localStorage.setItem('token', courierToken);
+          localStorage.setItem('user', JSON.stringify(courierUser));
+          
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user: courierUser, token: courierToken },
+          });
+          
+          toast.success(`Welcome back, ${COURIER_CREDENTIALS.firstName}! (Delivery Person)`);
+          return { success: true };
+        }
+        
+        // If no hardcoded account matches, re-throw the API error
+        throw apiError;
       }
-      
-      // Get the full user profile
-      const profileResponse = await authAPI.getProfile();
-      const userWithProfile = { ...user, ...(profileResponse?.data || {}) };
-
-      // Update the auth state
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: { 
-          user: userWithProfile, 
-          token 
-        },
-      });
-
-      // Customize welcome message based on user role
-      const roleMessages = {
-        government: 'Government Official',
-        pharmacy: 'Pharmacy Owner',
-        dispatcher: 'Delivery Person',
-        supplier: 'Medicine Supplier',
-        patient: 'Patient'
-      };
-      
-      const roleMessage = roleMessages[user.role] || '';
-      toast.success(`Welcome back, ${user.firstName || 'User'}! ${roleMessage ? `(${roleMessage})` : ''}`);
-      
-      return { success: true };
     } catch (error) {
       console.error('Login error:', error);
       
