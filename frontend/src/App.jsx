@@ -816,6 +816,25 @@ const searchGlobalMedicines = async (medicineName) => {
     const fallbackResults = [];
     const searchTerm = medicineName.trim().toLowerCase();
     
+    // Simulate pharmacy inventory data (in real app, this would come from backend)
+    const pharmacyInventoryData = {
+      'Amoxicillin 500mg': {
+        'Pharmacy A': { price: 110, quantity: 50 },
+        'Pharmacy B': { price: 125, quantity: 30 },
+        'Pharmacy C': { price: 115, quantity: 75 }
+      },
+      'Metformin 850mg': {
+        'Pharmacy A': { price: 85, quantity: 40 },
+        'Pharmacy B': { price: 95, quantity: 60 },
+        'Pharmacy C': { price: 90, quantity: 25 }
+      },
+      'Insulin Pen (Rapid)': {
+        'Pharmacy A': { price: 420, quantity: 15 },
+        'Pharmacy B': { price: 460, quantity: 20 },
+        'Pharmacy C': { price: 440, quantity: 10 }
+      }
+    };
+    
     // Search in base catalog first
     for (const medicine of baseMedicineCatalog) {
       if (medicine.name.toLowerCase().includes(searchTerm)) {
@@ -833,17 +852,23 @@ const searchGlobalMedicines = async (medicineName) => {
             distance = R * c;
           }
 
+          // Use pharmacy-specific price if available, otherwise use catalog price
+          const pharmacyName = pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`;
+          const pharmacyData = pharmacyInventoryData[medicine.name]?.[pharmacyName];
+          const price = pharmacyData?.price || medicine.averagePrice || 0;
+          const quantity = pharmacyData?.quantity || 10;
+
           fallbackResults.push({
             pharmacyId: pharmacy._id,
-            pharmacyName: pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`,
+            pharmacyName: pharmacyName,
             pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
             pharmacyCity: pharmacy.pharmacyLocation?.city || '',
             distance: distance,
             medicineName: medicine.name,
-            price: medicine.averagePrice || 0,
-            quantity: 10, // Default quantity for catalog medicines
-            availability: 'in_stock', // Assume available from catalog
-            source: 'catalog' // Mark as fallback data
+            price: price,
+            quantity: quantity,
+            availability: quantity > 0 ? 'in_stock' : 'out_of_stock',
+            source: pharmacyData ? 'pharmacy_inventory' : 'catalog' // Mark data source
           });
         }
       }
@@ -1883,6 +1908,20 @@ Logout
                     📋 Catalog Data
                   </div>
                 )}
+                {result.source === 'pharmacy_inventory' && (
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#059669',
+                    fontWeight: '600',
+                    marginTop: '4px',
+                    padding: '2px 6px',
+                    backgroundColor: '#d1fae5',
+                    borderRadius: '4px',
+                    display: 'inline-block'
+                  }}>
+                    🏪 Pharmacy Price
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ fontSize: '14px', color: '#4a5568', fontWeight: '500' }}>
@@ -2603,9 +2642,9 @@ const [activePanel, setActivePanel] = useState('inventory');
 
 const [alerts, setAlerts] = useState([]);
 const [inventory, setInventory] = useState([
-{ id: 'INV-101', name: 'Amoxicillin 500mg', stock: 320, unit: 'caps', reorderPoint: 150, expiry: 'Apr 2025', supplier: 'PharmaLab PLC' },
-{ id: 'INV-088', name: 'Metformin 850mg', stock: 140, unit: 'tabs', reorderPoint: 120, expiry: 'Jan 2026', supplier: 'LifePharm' },
-{ id: 'INV-230', name: 'Insulin Pen (Rapid)', stock: 40, unit: 'cartridges', reorderPoint: 60, expiry: 'Dec 2024', supplier: 'Novo Ethiopia' },
+{ id: 'INV-101', name: 'Amoxicillin 500mg', stock: 320, unit: 'caps', reorderPoint: 150, expiry: 'Apr 2025', supplier: 'PharmaLab PLC', price: 120 },
+{ id: 'INV-088', name: 'Metformin 850mg', stock: 140, unit: 'tabs', reorderPoint: 120, expiry: 'Jan 2026', supplier: 'LifePharm', price: 95 },
+{ id: 'INV-230', name: 'Insulin Pen (Rapid)', stock: 40, unit: 'cartridges', reorderPoint: 60, expiry: 'Dec 2024', supplier: 'Novo Ethiopia', price: 450 },
 ]);
 
 const [ordersQueue, setOrdersQueue] = useState([
@@ -2624,7 +2663,7 @@ const [feedback, setFeedback] = useState([
 { id: 'FDB-121', author: 'Patient • Eden', topic: 'Great counseling', detail: 'Appreciated the dosage explanation.', status: 'Resolved' },
 ]);
 
-const [inventoryForm, setInventoryForm] = useState({ name: '', delta: '', lot: '' });
+const [inventoryForm, setInventoryForm] = useState({ name: '', delta: '', lot: '', price: '' });
 const [shortageForm, setShortageForm] = useState({ medicine: '', severity: 'warning', notes: '' });
 const [feedbackNote, setFeedbackNote] = useState({ targetId: '', note: '' });
 
@@ -2652,12 +2691,13 @@ const handleInventorySubmit = (event) => {
 event.preventDefault();
 if (!inventoryForm.name.trim() || !inventoryForm.delta.trim()) return;
 const units = Number(inventoryForm.delta);
+const price = Number(inventoryForm.price) || 0;
 setInventory((prev) => {
 const existing = prev.find((item) => item.name === inventoryForm.name.trim());
 if (existing) {
 return prev.map((item) =>
 item.name === inventoryForm.name.trim()
-? { ...item, stock: Math.max(0, item.stock + units) }
+? { ...item, stock: Math.max(0, item.stock + units), price: price > 0 ? price : item.price }
 : item
 );
 }
@@ -2670,12 +2710,13 @@ unit: 'units',
 reorderPoint: 50,
 expiry: 'TBD',
 supplier: inventoryForm.lot.trim() || 'New supplier',
+price: price > 0 ? price : 50, // Default price if not specified
 },
 ...prev,
 ];
 });
-recordAlert(`Received ${inventoryForm.delta} units for ${inventoryForm.name}.`);
-setInventoryForm({ name: '', delta: '', lot: '' });
+recordAlert(`Received ${inventoryForm.delta} units for ${inventoryForm.name}${price > 0 ? ` at ETB ${price}` : ''}.`);
+setInventoryForm({ name: '', delta: '', lot: '', price: '' });
 };
 
 const handleShortageSubmit = (event) => {
@@ -2750,6 +2791,15 @@ value={inventoryForm.delta}
 onChange={(e) => setInventoryForm((prev) => ({ ...prev, delta: e.target.value }))}
 />
 <input
+type="number"
+step="0.01"
+min="0"
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+placeholder="Price per unit (ETB)"
+value={inventoryForm.price}
+onChange={(e) => setInventoryForm((prev) => ({ ...prev, price: e.target.value }))}
+/>
+<input
 style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
 placeholder="Batch / supplier"
 value={inventoryForm.lot}
@@ -2772,6 +2822,9 @@ Stock: {item.stock} {item.unit} • Reorder at {item.reorderPoint}
 <p style={{ margin: 0, color: '#718096', fontSize: '12px' }}>
 Expiry {item.expiry} • Supplier {item.supplier}
 </p>
+<div style={{ margin: '4px 0', fontSize: '14px', fontWeight: '600', color: '#059669' }}>
+💰 ETB {item.price} per unit
+</div>
 </div>
 <div style={{ display: 'flex', gap: '6px' }}>
 <button style={{ ...buttonBaseStyle, background: '#0f9d58' }} onClick={() => adjustStock(item.id, 25)}>
