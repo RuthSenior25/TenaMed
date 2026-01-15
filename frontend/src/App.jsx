@@ -4456,32 +4456,21 @@ element={user ? <DashboardRouter /> : <Navigate to="/login" replace />}
 const App = () => {
 return (
 <AuthProvider>
-<SupplyChainProvider>
 <Toaster 
 position="top-center"
 toastOptions={{
-duration: 5000,
+duration: 4000,
 style: {
 background: '#363636',
 color: '#fff',
 },
 success: {
 duration: 3000,
-theme: {
-primary: 'green',
-secondary: 'black',
-},
-},
-error: {
-duration: 5000,
-style: {
-background: '#ff4d4f',
-},
+iconTheme: 'light',
 },
 }}
 />
 <AppContent />
-</SupplyChainProvider>
 </AuthProvider>
 );
 };
