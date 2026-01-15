@@ -1644,7 +1644,6 @@ return (
               <button
                 onClick={() => {
                   setSelectedPharmacy(pharmacy);
-                  setOrderTrackAction('order');
                   setShowOrderTrackModal(true);
                 }}
                 style={{
@@ -1659,27 +1658,7 @@ return (
                   fontWeight: '500'
                 }}
               >
-                📦 Place Order
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedPharmacy(pharmacy);
-                  setOrderTrackAction('track');
-                  setShowOrderTrackModal(true);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                📍 Track Order
+                Place Order
               </button>
             </div>
           </div>
@@ -2053,19 +2032,9 @@ Open Prescriptions
 </div>
 <div style={cardBaseStyle}>
 <h3 style={cardTitleStyle}>Order Medication</h3>
-<p style={cardBodyStyle}>Fill out an order form and watch for queue update.</p>
-<button style={actionButtonStyle(activePanel === 'orders', '#48bb78')} onClick={() => {
-  // Find first approved pharmacy and set it as selected
-  const firstApprovedPharmacy = approvedPharmacies.length > 0 ? approvedPharmacies[0] : null;
-  if (firstApprovedPharmacy) {
-    setSelectedPharmacy(firstApprovedPharmacy);
-    setShowOrderTrackModal(true);
-    setOrderTrackAction('order');
-  } else {
-    alert('No approved pharmacies available. Please try again later.');
-  }
-}}>
-Place Order
+<p style={cardBodyStyle}>Fill out an order form and watch the queue update.</p>
+<button style={actionButtonStyle(activePanel === 'orders', '#48bb78')} onClick={() => setActivePanel('orders')}>
+Order / Track
 </button>
 </div>
 <div style={cardBaseStyle}>
@@ -2080,6 +2049,13 @@ View Pharmacies
 <p style={cardBodyStyle}>Confirm when a courier drops off your package.</p>
 <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
 View Deliveries
+</button>
+</div>
+<div style={cardBaseStyle}>
+<h3 style={cardTitleStyle}>My Profile</h3>
+<p style={cardBodyStyle}>View and manage your personal and medical information.</p>
+<button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
+View Profile
 </button>
 </div>
 </div>
@@ -2115,70 +2091,65 @@ View Deliveries
       width: '100%'
     }}>
       <h3 style={{ margin: '0 0 24px', color: '#2d3748', fontSize: '24px', fontWeight: '700' }}>
-        {orderTrackAction === 'order' ? '📦 Place Order' : '📍 Track Order'}
+        What would you like to do?
       </h3>
       
       <div style={{ marginBottom: '24px' }}>
         <p style={{ margin: '0 0 16px', color: '#718096', fontSize: '16px' }}>
-          {orderTrackAction === 'order' 
-            ? `Place an order with ${selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}`
-            : `Track your orders from ${selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}`
-          }
+          Choose an action for <strong>{selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}</strong>
         </p>
       </div>
       
       <div style={{ display: 'flex', gap: '16px', flexDirection: 'column' }}>
-        {orderTrackAction === 'order' && (
-          <button
-            onClick={() => {
-              setShowOrderTrackModal(false);
-              setShowOrderModal(true);
-            }}
-            style={{
-              padding: '16px 24px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '600',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            📦 Continue to Order
-          </button>
-        )}
+        <button
+          onClick={() => {
+            setOrderTrackAction('order');
+            setShowOrderTrackModal(false);
+            setShowOrderModal(true);
+          }}
+          style={{
+            padding: '16px 24px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📦 Place Order
+        </button>
         
-        {orderTrackAction === 'track' && (
-          <button
-            onClick={() => {
-              setShowOrderTrackModal(false);
-              setActivePanel('orders');
-            }}
-            style={{
-              padding: '16px 24px',
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: '600',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            📍 View Orders
-          </button>
-        )}
+        <button
+          onClick={() => {
+            setOrderTrackAction('track');
+            setShowOrderTrackModal(false);
+            setActivePanel('orders');
+          }}
+          style={{
+            padding: '16px 24px',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: '600',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📍 Track Order
+        </button>
         
         <button
           onClick={() => {
@@ -4288,6 +4259,13 @@ const DeliveryDashboard = () => {
               View Completed ({completedOrders.length})
             </button>
           </div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>My Profile</h3>
+            <p style={cardBodyStyle}>View and update your delivery profile</p>
+            <button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
+              View Profile
+            </button>
+          </div>
         </div>
 
         {/* Workspace */}
@@ -4505,4 +4483,4 @@ background: '#ff4d4f',
 );
 };
 
-export default App;1  
+export default App;
