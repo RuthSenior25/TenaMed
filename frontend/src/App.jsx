@@ -322,6 +322,7 @@ const [lastFetchTime, setLastFetchTime] = useState(0);
 const [fetchTimeout, setFetchTimeout] = useState(null);
 const [showOrderModal, setShowOrderModal] = useState(false);
 const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+const [activePanel, setActivePanel] = useState('overview');
 const [orderForm, setOrderForm] = useState({
   medications: [{ name: '', quantity: 1, instructions: '' }],
   deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
