@@ -12,6 +12,7 @@ const allowedOrigins = [
   'https://tena-med.vercel.app',
   'https://tena-65tcayt50-ruths-projects-7791b467.vercel.app',
   'https://tena-70d19m7yr-ruths-projects-7791b467.vercel.app',
+  'https://tena-he3eopgfq-ruths-projects-7791b467.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
