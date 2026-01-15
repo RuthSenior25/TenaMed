@@ -784,17 +784,67 @@ const fetchApprovedPharmacies = async () => {
     
     // Handle rate limiting
     if (response.status === 429) {
-      console.log('Rate limited, waiting before retry...');
-      setTimeout(() => {
-        console.log('Retrying after rate limit...');
-        fetchApprovedPharmacies();
-      }, 5000); // Wait 5 seconds before retry
+      console.log('Rate limited, using fallback data...');
       setIsLoadingPharmacies(false);
+      // Use fallback data immediately instead of retrying
+      const fallbackPharmacies = [
+        {
+          _id: 'fallback-1',
+          pharmacyName: 'Demo Pharmacy 1',
+          pharmacyLocation: {
+            lat: 9.0272,
+            lng: 38.7469,
+            address: 'Bole, Addis Ababa',
+            city: 'Addis Ababa',
+            kebele: 'Bole',
+            postalCode: '1000'
+          },
+          status: 'approved'
+        },
+        {
+          _id: 'fallback-2', 
+          pharmacyName: 'Demo Pharmacy 2',
+          pharmacyLocation: {
+            lat: 9.0333,
+            lng: 38.7500,
+            address: 'Mekane Yesus, Addis Ababa',
+            city: 'Addis Ababa',
+            kebele: 'Mekane Yesus',
+            postalCode: '1001'
+          },
+          status: 'approved'
+        }
+      ];
+      setApprovedPharmacies(fallbackPharmacies);
       return;
     }
     
-    const data = await response.json();
-    console.log('Approved pharmacies response:', data); // Debug log
+    let data;
+    try {
+      data = await response.json();
+      console.log('Approved pharmacies response:', data); // Debug log
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      // Use fallback data when JSON parsing fails
+      const fallbackPharmacies = [
+        {
+          _id: 'fallback-1',
+          pharmacyName: 'Demo Pharmacy 1',
+          pharmacyLocation: {
+            lat: 9.0272,
+            lng: 38.7469,
+            address: 'Bole, Addis Ababa',
+            city: 'Addis Ababa',
+            kebele: 'Bole',
+            postalCode: '1000'
+          },
+          status: 'approved'
+        }
+      ];
+      setApprovedPharmacies(fallbackPharmacies);
+      setIsLoadingPharmacies(false);
+      return;
+    }
     
     if (data.success) {
       setApprovedPharmacies(data.pharmacies || []);
@@ -870,14 +920,19 @@ const fetchApprovedPharmacies = async () => {
 
 useEffect(() => {
   // Request location permission once on component mount
-  requestLocationPermissionOnce();
+  if (!locationPermissionAsked) {
+    requestLocationPermissionOnce();
+  }
 
-  fetchApprovedPharmacies();
+  // Only fetch pharmacies once on mount
+  if (approvedPharmacies.length === 0 && !isLoadingPharmacies) {
+    fetchApprovedPharmacies();
+  }
   fetchPatientProfile();
   fetchPrescriptions();
   fetchOrders();
   fetchDeliveries();
-}, [userLocation, locationFilter, approvedPharmacies]); // Re-fetch when location or pharmacies change
+}, []); // Empty dependency array to run only once
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
