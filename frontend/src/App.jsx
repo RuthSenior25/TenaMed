@@ -110,140 +110,6 @@ const pharmacyDirectory = [
 { id: 'PH-004', name: 'Lafto Prime Pharmacy', license: 'LIC-5012', city: 'Addis Ababa', kebele: 'Lafto 04', status: 'approved' },
 ];
 
-const SupplyChainContext = React.createContext({
-supplyLedger: [],
-priceBoard: {},
-addShipment: () => {},
-updateShipmentStatus: () => {},
-});
-
-const buildBasePriceBoard = () => {
-const board = {};
-baseMedicineCatalog.forEach((med) => {
-board[med.id] = med.pharmacies.map((listing) => ({ ...listing }));
-});
-return board;
-};
-
-const updateBoardWithShipment = (board, shipment) => {
-const nextBoard = { ...board };
-const listings = nextBoard[shipment.medicineId] ? [...nextBoard[shipment.medicineId]] : [];
-const pharmacyMeta = pharmacyDirectory.find((item) => item.id === shipment.pharmacyId) || {
-name: shipment.pharmacyName || 'Unlisted pharmacy',
-city: shipment.pharmacyCity || 'Addis Ababa',
-kebele: shipment.pharmacyKebele || '',
-};
-const patientPrice = Math.max(
-10,
-Math.round(Number(shipment.wholesalePrice || 0) * (1 + Number(shipment.markupPercent || 0) / 100))
-) || Number(shipment.wholesalePrice) || 10;
-const updatedListing = {
-name: pharmacyMeta.name,
-location: pharmacyMeta.city ? `${pharmacyMeta.city}${pharmacyMeta.kebele ? `, ${pharmacyMeta.kebele}` : ''}` : 'Addis Ababa',
-price: patientPrice,
-rating: 4.5,
-};
-const existingIndex = listings.findIndex((entry) => entry.name === updatedListing.name);
-if (existingIndex >= 0) {
-listings[existingIndex] = { ...listings[existingIndex], ...updatedListing };
-} else {
-listings.push(updatedListing);
-}
-nextBoard[shipment.medicineId] = listings;
-return nextBoard;
-};
-
-const initialSupplyLedger = [
-{
-id: 'SUP-1001',
-supplier: 'MedSupply Global',
-pharmacyId: 'PH-001',
-pharmacyName: 'Addis Lifeline Pharmacy',
-medicineId: 'MED-001',
-medicineName: 'Amoxicillin 500mg',
-quantity: 200,
-wholesalePrice: 80,
-markupPercent: 25,
-status: 'Delivered',
-eta: 'Delivered yesterday',
-createdAt: '2025-01-01T08:00:00Z',
-},
-{
-id: 'SUP-0998',
-supplier: 'BlueNile Pharma Supply',
-pharmacyId: 'PH-003',
-pharmacyName: 'CMC Community Pharmacy',
-medicineId: 'MED-004',
-medicineName: 'Insulin Pen (Rapid)',
-quantity: 60,
-wholesalePrice: 320,
-markupPercent: 35,
-status: 'In transit',
-eta: 'Arrives tomorrow',
-createdAt: '2025-01-04T09:30:00Z',
-},
-{
-id: 'SUP-0995',
-supplier: 'Sunrise Generics',
-pharmacyId: 'PH-004',
-pharmacyName: 'Lafto Prime Pharmacy',
-medicineId: 'MED-002',
-medicineName: 'Ibuprofen 200mg',
-quantity: 500,
-wholesalePrice: 18,
-markupPercent: 60,
-status: 'Delivered',
-eta: 'Delivered today',
-createdAt: '2025-01-05T11:00:00Z',
-},
-];
-
-const deriveInitialPriceBoard = () =>
-initialSupplyLedger.reduce((board, shipment) => updateBoardWithShipment(board, shipment), buildBasePriceBoard());
-
-const SupplyChainProvider = ({ children }) => {
-const [supplyLedger, setSupplyLedger] = useState(initialSupplyLedger);
-const [priceBoard, setPriceBoard] = useState(() => deriveInitialPriceBoard());
-
-const addShipment = (payload) => {
-if (!payload?.medicineId || !payload?.pharmacyId) return;
-const medicineMeta = baseMedicineCatalog.find((med) => med.id === payload.medicineId);
-const pharmacyMeta = pharmacyDirectory.find((pharm) => pharm.id === payload.pharmacyId);
-const shipment = {
-id: `SUP-${Math.floor(Math.random() * 9000 + 1000)}`,
-supplier: payload.supplier || 'Supplier',
-pharmacyId: payload.pharmacyId,
-pharmacyName: pharmacyMeta?.name || payload.pharmacyName || 'Unlisted pharmacy',
-medicineId: payload.medicineId,
-medicineName: medicineMeta?.name || payload.medicineName || 'Unlisted medicine',
-quantity: Number(payload.quantity) || 0,
-wholesalePrice: Number(payload.wholesalePrice) || 0,
-markupPercent: Number(payload.markupPercent) || 0,
-status: 'In transit',
-eta: payload.eta || 'ETA soon',
-createdAt: new Date().toISOString(),
-};
-
-setSupplyLedger((prev) => [shipment, ...prev]);
-setPriceBoard((prevBoard) => updateBoardWithShipment(prevBoard, shipment));
-};
-
-const updateShipmentStatus = (shipmentId, nextStatus) => {
-setSupplyLedger((prev) =>
-prev.map((entry) => (entry.id === shipmentId ? { ...entry, status: nextStatus } : entry))
-);
-};
-
-const contextValue = useMemo(
-() => ({ supplyLedger, priceBoard, addShipment, updateShipmentStatus }),
-[supplyLedger, priceBoard]
-);
-
-return <SupplyChainContext.Provider value={contextValue}>{children}</SupplyChainContext.Provider>;
-};
-
-const useSupplyChain = () => useContext(SupplyChainContext);
-
 // Landing page component
 const Landing = () => {
 return (
@@ -2524,7 +2390,7 @@ View Profile
 const SupplierDashboard = () => {
 const navigate = useNavigate();
 const { logout, user } = useAuth();
-const { supplyLedger, addShipment, updateShipmentStatus } = useSupplyChain();
+const [supplyLedger, setSupplyLedger] = useState([]);
 const [activePanel, setActivePanel] = useState('overview');
 const [shipmentForm, setShipmentForm] = useState({
 pharmacyId: 'PH-001',
