@@ -2053,9 +2053,19 @@ Open Prescriptions
 </div>
 <div style={cardBaseStyle}>
 <h3 style={cardTitleStyle}>Order Medication</h3>
-<p style={cardBodyStyle}>Fill out an order form and watch the queue update.</p>
-<button style={actionButtonStyle(activePanel === 'orders', '#48bb78')} onClick={() => setActivePanel('orders')}>
-Order / Track
+<p style={cardBodyStyle}>Fill out an order form and watch for queue update.</p>
+<button style={actionButtonStyle(activePanel === 'orders', '#48bb78')} onClick={() => {
+  // Find first approved pharmacy and set it as selected
+  const firstApprovedPharmacy = approvedPharmacies.length > 0 ? approvedPharmacies[0] : null;
+  if (firstApprovedPharmacy) {
+    setSelectedPharmacy(firstApprovedPharmacy);
+    setShowOrderTrackModal(true);
+    setOrderTrackAction('order');
+  } else {
+    alert('No approved pharmacies available. Please try again later.');
+  }
+}}>
+Place Order
 </button>
 </div>
 <div style={cardBaseStyle}>
@@ -4495,4 +4505,4 @@ background: '#ff4d4f',
 );
 };
 
-export default App;
+export default App;1  
