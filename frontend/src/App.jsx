@@ -1,4 +1,3 @@
-// TenaMed Healthcare Drug Tracking Platform - v2.0.1
 import React, { useState, useMemo, useContext, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -110,6 +109,140 @@ const pharmacyDirectory = [
 { id: 'PH-003', name: 'CMC Community Pharmacy', license: 'LIC-4410', city: 'Addis Ababa', kebele: 'CMC 09', status: 'approved' },
 { id: 'PH-004', name: 'Lafto Prime Pharmacy', license: 'LIC-5012', city: 'Addis Ababa', kebele: 'Lafto 04', status: 'approved' },
 ];
+
+const SupplyChainContext = React.createContext({
+supplyLedger: [],
+priceBoard: {},
+addShipment: () => {},
+updateShipmentStatus: () => {},
+});
+
+const buildBasePriceBoard = () => {
+const board = {};
+baseMedicineCatalog.forEach((med) => {
+board[med.id] = med.pharmacies.map((listing) => ({ ...listing }));
+});
+return board;
+};
+
+const updateBoardWithShipment = (board, shipment) => {
+const nextBoard = { ...board };
+const listings = nextBoard[shipment.medicineId] ? [...nextBoard[shipment.medicineId]] : [];
+const pharmacyMeta = pharmacyDirectory.find((item) => item.id === shipment.pharmacyId) || {
+name: shipment.pharmacyName || 'Unlisted pharmacy',
+city: shipment.pharmacyCity || 'Addis Ababa',
+kebele: shipment.pharmacyKebele || '',
+};
+const patientPrice = Math.max(
+10,
+Math.round(Number(shipment.wholesalePrice || 0) * (1 + Number(shipment.markupPercent || 0) / 100))
+) || Number(shipment.wholesalePrice) || 10;
+const updatedListing = {
+name: pharmacyMeta.name,
+location: pharmacyMeta.city ? `${pharmacyMeta.city}${pharmacyMeta.kebele ? `, ${pharmacyMeta.kebele}` : ''}` : 'Addis Ababa',
+price: patientPrice,
+rating: 4.5,
+};
+const existingIndex = listings.findIndex((entry) => entry.name === updatedListing.name);
+if (existingIndex >= 0) {
+listings[existingIndex] = { ...listings[existingIndex], ...updatedListing };
+} else {
+listings.push(updatedListing);
+}
+nextBoard[shipment.medicineId] = listings;
+return nextBoard;
+};
+
+const initialSupplyLedger = [
+{
+id: 'SUP-1001',
+supplier: 'MedSupply Global',
+pharmacyId: 'PH-001',
+pharmacyName: 'Addis Lifeline Pharmacy',
+medicineId: 'MED-001',
+medicineName: 'Amoxicillin 500mg',
+quantity: 200,
+wholesalePrice: 80,
+markupPercent: 25,
+status: 'Delivered',
+eta: 'Delivered yesterday',
+createdAt: '2025-01-01T08:00:00Z',
+},
+{
+id: 'SUP-0998',
+supplier: 'BlueNile Pharma Supply',
+pharmacyId: 'PH-003',
+pharmacyName: 'CMC Community Pharmacy',
+medicineId: 'MED-004',
+medicineName: 'Insulin Pen (Rapid)',
+quantity: 60,
+wholesalePrice: 320,
+markupPercent: 35,
+status: 'In transit',
+eta: 'Arrives tomorrow',
+createdAt: '2025-01-04T09:30:00Z',
+},
+{
+id: 'SUP-0995',
+supplier: 'Sunrise Generics',
+pharmacyId: 'PH-004',
+pharmacyName: 'Lafto Prime Pharmacy',
+medicineId: 'MED-002',
+medicineName: 'Ibuprofen 200mg',
+quantity: 500,
+wholesalePrice: 18,
+markupPercent: 60,
+status: 'Delivered',
+eta: 'Delivered today',
+createdAt: '2025-01-05T11:00:00Z',
+},
+];
+
+const deriveInitialPriceBoard = () =>
+initialSupplyLedger.reduce((board, shipment) => updateBoardWithShipment(board, shipment), buildBasePriceBoard());
+
+const SupplyChainProvider = ({ children }) => {
+const [supplyLedger, setSupplyLedger] = useState(initialSupplyLedger);
+const [priceBoard, setPriceBoard] = useState(() => deriveInitialPriceBoard());
+
+const addShipment = (payload) => {
+if (!payload?.medicineId || !payload?.pharmacyId) return;
+const medicineMeta = baseMedicineCatalog.find((med) => med.id === payload.medicineId);
+const pharmacyMeta = pharmacyDirectory.find((pharm) => pharm.id === payload.pharmacyId);
+const shipment = {
+id: `SUP-${Math.floor(Math.random() * 9000 + 1000)}`,
+supplier: payload.supplier || 'Supplier',
+pharmacyId: payload.pharmacyId,
+pharmacyName: pharmacyMeta?.name || payload.pharmacyName || 'Unlisted pharmacy',
+medicineId: payload.medicineId,
+medicineName: medicineMeta?.name || payload.medicineName || 'Unlisted medicine',
+quantity: Number(payload.quantity) || 0,
+wholesalePrice: Number(payload.wholesalePrice) || 0,
+markupPercent: Number(payload.markupPercent) || 0,
+status: 'In transit',
+eta: payload.eta || 'ETA soon',
+createdAt: new Date().toISOString(),
+};
+
+setSupplyLedger((prev) => [shipment, ...prev]);
+setPriceBoard((prevBoard) => updateBoardWithShipment(prevBoard, shipment));
+};
+
+const updateShipmentStatus = (shipmentId, nextStatus) => {
+setSupplyLedger((prev) =>
+prev.map((entry) => (entry.id === shipmentId ? { ...entry, status: nextStatus } : entry))
+);
+};
+
+const contextValue = useMemo(
+() => ({ supplyLedger, priceBoard, addShipment, updateShipmentStatus }),
+[supplyLedger, priceBoard]
+);
+
+return <SupplyChainContext.Provider value={contextValue}>{children}</SupplyChainContext.Provider>;
+};
+
+const useSupplyChain = () => useContext(SupplyChainContext);
 
 // Landing page component
 const Landing = () => {
@@ -314,15 +447,12 @@ transition: 'all 0.2s ease',
 const PatientDashboard = () => {
 const navigate = useNavigate();
 const { logout } = useAuth();
-const [userLocation, setUserLocation] = useState(null);
-const [locationPermission, setLocationPermission] = useState('prompt');
+const { priceBoard } = useSupplyChain();
+const [activePanel, setActivePanel] = useState('pharmacies');
 const [approvedPharmacies, setApprovedPharmacies] = useState([]);
-const [isLoadingPharmacies, setIsLoadingPharmacies] = useState(false);
-const [lastFetchTime, setLastFetchTime] = useState(0);
-const [fetchTimeout, setFetchTimeout] = useState(null);
+const [isLoadingPharmacies, setIsLoadingPharmacies] = useState(true);
 const [showOrderModal, setShowOrderModal] = useState(false);
 const [selectedPharmacy, setSelectedPharmacy] = useState(null);
-const [activePanel, setActivePanel] = useState('overview');
 const [orderForm, setOrderForm] = useState({
   medications: [{ name: '', quantity: 1, instructions: '' }],
   deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
@@ -339,6 +469,7 @@ const [selectedMedicineForComparison, setSelectedMedicineForComparison] = useSta
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
+const [userLocation, setUserLocation] = useState(null);
 const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
 const [showOrderTrackModal, setShowOrderTrackModal] = useState(false);
 const [orderTrackAction, setOrderTrackAction] = useState(''); // 'order' or 'track'
@@ -375,9 +506,9 @@ const medicineCatalog = useMemo(
 () =>
 baseMedicineCatalog.map((med) => ({
 ...med,
-pharmacies: med.pharmacies, // Use base catalog pharmacies directly
+pharmacies: priceBoard[med.id] && priceBoard[med.id].length > 0 ? priceBoard[med.id] : med.pharmacies,
 })),
-[]
+[priceBoard]
 );
 
 const statCards = [
@@ -616,16 +747,8 @@ const fetchDeliveries = async () => {
 
 // Fetch approved pharmacies from backend
 const fetchApprovedPharmacies = async () => {
-  // Prevent multiple rapid requests
-  const now = Date.now();
-  if (now - lastFetchTime < 2000) { // 2 second debounce
-    console.log('Request debounced, skipping...');
-    return;
-  }
-  
   try {
     setIsLoadingPharmacies(true);
-    setLastFetchTime(now);
     const token = localStorage.getItem('token');
     console.log('Token found:', token ? 'Yes' : 'No'); // Debug log
     
@@ -649,138 +772,16 @@ const fetchApprovedPharmacies = async () => {
     });
     
     console.log('Response status:', response.status); // Debug log
-    
-    // Handle rate limiting
-    if (response.status === 429) {
-      console.log('Rate limited, using fallback data...');
-      setIsLoadingPharmacies(false);
-      // Use fallback data immediately instead of retrying
-      const fallbackPharmacies = [
-        {
-          _id: 'fallback-1',
-          pharmacyName: 'Demo Pharmacy 1',
-          pharmacyLocation: {
-            lat: 9.0272,
-            lng: 38.7469,
-            address: 'Bole, Addis Ababa',
-            city: 'Addis Ababa',
-            kebele: 'Bole',
-            postalCode: '1000'
-          },
-          status: 'approved'
-        },
-        {
-          _id: 'fallback-2', 
-          pharmacyName: 'Demo Pharmacy 2',
-          pharmacyLocation: {
-            lat: 9.0333,
-            lng: 38.7500,
-            address: 'Mekane Yesus, Addis Ababa',
-            city: 'Addis Ababa',
-            kebele: 'Mekane Yesus',
-            postalCode: '1001'
-          },
-          status: 'approved'
-        }
-      ];
-      setApprovedPharmacies(fallbackPharmacies);
-      return;
-    }
-    
-    let data;
-    try {
-      data = await response.json();
-      console.log('Approved pharmacies response:', data); // Debug log
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      // Use fallback data when JSON parsing fails
-      const fallbackPharmacies = [
-        {
-          _id: 'fallback-1',
-          pharmacyName: 'Demo Pharmacy 1',
-          pharmacyLocation: {
-            lat: 9.0272,
-            lng: 38.7469,
-            address: 'Bole, Addis Ababa',
-            city: 'Addis Ababa',
-            kebele: 'Bole',
-            postalCode: '1000'
-          },
-          status: 'approved'
-        }
-      ];
-      setApprovedPharmacies(fallbackPharmacies);
-      setIsLoadingPharmacies(false);
-      return;
-    }
+    const data = await response.json();
+    console.log('Approved pharmacies response:', data); // Debug log
     
     if (data.success) {
       setApprovedPharmacies(data.pharmacies || []);
     } else {
       console.error('API returned error:', data.message);
-      // Use fallback pharmacy data with locations
-      const fallbackPharmacies = [
-        {
-          _id: 'fallback-1',
-          pharmacyName: 'Demo Pharmacy 1',
-          pharmacyLocation: {
-            lat: 9.0272,
-            lng: 38.7469,
-            address: 'Bole, Addis Ababa',
-            city: 'Addis Ababa',
-            kebele: 'Bole',
-            postalCode: '1000'
-          },
-          status: 'approved'
-        },
-        {
-          _id: 'fallback-2', 
-          pharmacyName: 'Demo Pharmacy 2',
-          pharmacyLocation: {
-            lat: 9.0333,
-            lng: 38.7500,
-            address: 'Mekane Yesus, Addis Ababa',
-            city: 'Addis Ababa',
-            kebele: 'Mekane Yesus',
-            postalCode: '1001'
-          },
-          status: 'approved'
-        }
-      ];
-      setApprovedPharmacies(fallbackPharmacies);
     }
   } catch (error) {
     console.error('Error fetching approved pharmacies:', error);
-    // Use fallback pharmacy data when API fails
-    const fallbackPharmacies = [
-      {
-        _id: 'fallback-1',
-        pharmacyName: 'Demo Pharmacy 1',
-        pharmacyLocation: {
-          lat: 9.0272,
-          lng: 38.7469,
-          address: 'Bole, Addis Ababa',
-          city: 'Addis Ababa',
-          kebele: 'Bole',
-          postalCode: '1000'
-        },
-        status: 'approved'
-      },
-      {
-        _id: 'fallback-2', 
-        pharmacyName: 'Demo Pharmacy 2',
-        pharmacyLocation: {
-          lat: 9.0333,
-          lng: 38.7500,
-          address: 'Mekane Yesus, Addis Ababa',
-          city: 'Addis Ababa',
-          kebele: 'Mekane Yesus',
-          postalCode: '1001'
-        },
-        status: 'approved'
-      }
-    ];
-    setApprovedPharmacies(fallbackPharmacies);
   } finally {
     setIsLoadingPharmacies(false);
   }
@@ -788,19 +789,14 @@ const fetchApprovedPharmacies = async () => {
 
 useEffect(() => {
   // Request location permission once on component mount
-  if (!locationPermissionAsked) {
-    requestLocationPermissionOnce();
-  }
+  requestLocationPermissionOnce();
 
-  // Only fetch pharmacies once on mount
-  if (approvedPharmacies.length === 0 && !isLoadingPharmacies) {
-    fetchApprovedPharmacies();
-  }
+  fetchApprovedPharmacies();
   fetchPatientProfile();
   fetchPrescriptions();
   fetchOrders();
   fetchDeliveries();
-}, []); // Empty dependency array to run only once
+}, [userLocation, locationFilter, approvedPharmacies]); // Re-fetch when location or pharmacies change
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
@@ -2392,7 +2388,7 @@ View Profile
 const SupplierDashboard = () => {
 const navigate = useNavigate();
 const { logout, user } = useAuth();
-const [supplyLedger, setSupplyLedger] = useState([]);
+const { supplyLedger, addShipment, updateShipmentStatus } = useSupplyChain();
 const [activePanel, setActivePanel] = useState('overview');
 const [shipmentForm, setShipmentForm] = useState({
 pharmacyId: 'PH-001',
@@ -4457,21 +4453,32 @@ element={user ? <DashboardRouter /> : <Navigate to="/login" replace />}
 const App = () => {
 return (
 <AuthProvider>
+<SupplyChainProvider>
 <Toaster 
 position="top-center"
 toastOptions={{
-duration: 4000,
+duration: 5000,
 style: {
 background: '#363636',
 color: '#fff',
 },
 success: {
 duration: 3000,
-iconTheme: 'light',
+theme: {
+primary: 'green',
+secondary: 'black',
+},
+},
+error: {
+duration: 5000,
+style: {
+background: '#ff4d4f',
+},
 },
 }}
 />
 <AppContent />
+</SupplyChainProvider>
 </AuthProvider>
 );
 };
