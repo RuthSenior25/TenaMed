@@ -471,7 +471,6 @@ const [selectedMedicineForComparison, setSelectedMedicineForComparison] = useSta
 const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 const [checkingAvailability, setCheckingAvailability] = useState({});
 const [availabilityResults, setAvailabilityResults] = useState({});
-const [userLocation, setUserLocation] = useState(null);
 const [locationPermissionAsked, setLocationPermissionAsked] = useState(false);
 const [showOrderTrackModal, setShowOrderTrackModal] = useState(false);
 const [orderTrackAction, setOrderTrackAction] = useState(''); // 'order' or 'track'
