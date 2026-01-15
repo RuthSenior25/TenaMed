@@ -507,9 +507,9 @@ const medicineCatalog = useMemo(
 () =>
 baseMedicineCatalog.map((med) => ({
 ...med,
-pharmacies: priceBoard[med.id] && priceBoard[med.id].length > 0 ? priceBoard[med.id] : med.pharmacies,
+pharmacies: med.pharmacies, // Use base catalog pharmacies directly
 })),
-[priceBoard]
+[]
 );
 
 const statCards = [

@@ -208,8 +208,9 @@ export const authAPI = {
         };
       }
       
-      const response = await api.get('/auth/verify-token');
-      return { valid: true, user: response.data.user };
+      // Use /auth/me endpoint instead of /auth/verify-token
+      const response = await api.get('/auth/me');
+      return { valid: true, user: response.data };
     } catch (error) {
       console.error('Token verification error:', error);
       return { valid: false };
