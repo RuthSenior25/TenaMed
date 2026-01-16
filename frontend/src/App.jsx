@@ -918,7 +918,7 @@ const searchGlobalMedicines = async (medicineName) => {
             source: 'pharmacy_inventory'
           });
         }
-      }
+      });
     }
     
     console.log('Fallback results from catalog:', fallbackResults);
