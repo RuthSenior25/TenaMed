@@ -591,8 +591,7 @@ const requestLocationPermissionOnce = () => {
       },
       (error) => {
         console.error('Error getting location:', error);
-        localStorage.setItem('locationPermissionAsked', 'true');
-        setLocationPermissionAsked(true);
+        // Don't set permissionAsked on error, so user can try again
         
         // Show error message
         const errorDiv = document.createElement('div');
@@ -614,7 +613,7 @@ const requestLocationPermissionOnce = () => {
           <div style="font-size: 16px;">❌</div>
           <div>
             <div style="color: #991b1b; font-size: 12px; font-weight: 600;">Location Access Denied</div>
-            <div style="color: #b91c1c; font-size: 11px;">Enable location in browser settings to see nearby pharmacies</div>
+            <div style="color: #b91c1c; font-size: 11px;">Click again to retry or enable location in browser settings</div>
           </div>
         `;
         
