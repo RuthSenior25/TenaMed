@@ -2883,11 +2883,58 @@ const [inventory, setInventory] = useState([
 { id: 'INV-230', name: 'Insulin Pen (Rapid)', stock: 40, unit: 'cartridges', reorderPoint: 60, expiry: 'Dec 2024', supplier: 'Novo Ethiopia', price: 450 },
 ]);
 
-const [ordersQueue, setOrdersQueue] = useState([
-{ id: 'ORD-7901', patient: 'Selam M', medicine: 'Metformin 850mg', qty: 2, status: 'Pending verification' },
-{ id: 'ORD-7894', patient: 'Abel T', medicine: 'Insulin Pen (Rapid)', qty: 1, status: 'Awaiting pickup' },
-{ id: 'ORD-7888', patient: 'Rahel G', medicine: 'Vitamin D3', qty: 3, status: 'Packed' },
-]);
+const [ordersQueue, setOrdersQueue] = useState([]);
+
+// Fetch pharmacy orders from backend
+const fetchPharmacyOrders = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/pharmacy-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      setOrdersQueue(data.data);
+    }
+  } catch (error) {
+    console.error('Error fetching pharmacy orders:', error);
+  }
+};
+
+// Fetch orders on component mount
+useEffect(() => {
+  fetchPharmacyOrders();
+}, []);
+
+// Update order status
+const updateOrderStatus = async (orderId, newStatus) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/${orderId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status: newStatus })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      // Refresh orders list
+      fetchPharmacyOrders();
+      alert('Order status updated successfully!');
+    } else {
+      alert('Failed to update order status: ' + (data.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    alert('Failed to update order status. Please try again.');
+  }
+};
 
 const [shortageReports, setShortageReports] = useState([
 { id: 'SRT-301', medicine: 'Insulin Pen (Rapid)', severity: 'critical', submitted: 'Today', status: 'Escalated to supplier' },
@@ -3134,28 +3181,50 @@ return (
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
 <h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Order fulfillment queue</h4>
 {ordersQueue.map((order) => (
-<div key={order.id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+<div key={order._id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '12px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 <div>
-<div style={{ fontWeight: 600 }}>{order.medicine}</div>
-<p style={{ margin: 0, color: '#4a5568' }}>Patient: {order.patient}</p>
-<p style={{ margin: 0, color: '#4a5568' }}>Qty {order.qty}</p>
+<div style={{ fontWeight: 600 }}>
+{order.medications && order.medications.length > 0 
+  ? order.medications.map(med => `${med.name} (${med.quantity})`).join(', ')
+  : 'Medication details not available'
+}
+</div>
+<p style={{ margin: 0, color: '#4a5568' }}>Patient: {order.patientId?.email || 'Unknown'}</p>
+<p style={{ margin: 0, color: '#4a5568' }}>Total: ${order.totalAmount}</p>
+<p style={{ margin: 0, color: '#718096', fontSize: '12px' }}>
+{order.deliveryAddress?.street}, {order.deliveryAddress?.city}
+</p>
 </div>
 <div style={{ textAlign: 'right' }}>
 <span
 style={{
 padding: '6px 12px',
 borderRadius: '999px',
-background: order.status === 'Completed' ? '#c6f6d5' : '#fefcbf',
-color: order.status === 'Completed' ? '#22543d' : '#744210',
+background: order.status === 'delivered' ? '#c6f6d5' : 
+            order.status === 'confirmed' ? '#dbeafe' :
+            order.status === 'preparing' ? '#fef3c7' : '#fefcbf',
+color: order.status === 'delivered' ? '#22543d' : 
+       order.status === 'confirmed' ? '#1e40af' :
+       order.status === 'preparing' ? '#92400e' : '#744210',
 fontSize: '12px',
 fontWeight: 600,
 }}
 >
-{order.status}
+{order.status.charAt(0).toUpperCase() + order.status.slice(1)}
 </span>
-{order.status !== 'Completed' && (
-<button style={{ ...buttonBaseStyle, background: '#1d4ed8', marginTop: '8px' }} onClick={() => advanceOrder(order.id)}>
-Progress stage
+{order.status === 'pending' && (
+<button style={{ ...buttonBaseStyle, background: '#10b981', marginTop: '8px' }} onClick={() => updateOrderStatus(order._id, 'confirmed')}>
+Accept Order
+</button>
+)}
+{order.status === 'confirmed' && (
+<button style={{ ...buttonBaseStyle, background: '#3b82f6', marginTop: '8px' }} onClick={() => updateOrderStatus(order._id, 'preparing')}>
+Start Preparing
+</button>
+)}
+{order.status === 'preparing' && (
+<button style={{ ...buttonBaseStyle, background: '#f59e0b', marginTop: '8px' }} onClick={() => updateOrderStatus(order._id, 'ready')}>
+Mark Ready
 </button>
 )}
 </div>
