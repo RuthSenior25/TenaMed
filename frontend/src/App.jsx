@@ -1233,13 +1233,32 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     
+    // Validate order data
+    const validMedications = orderForm.medications.filter(med => med.name.trim());
+    if (validMedications.length === 0) {
+      alert('Please add at least one medication to your order.');
+      return;
+    }
+
+    if (!orderForm.deliveryAddress.street || !orderForm.deliveryAddress.city) {
+      alert('Please provide complete delivery address (street and city are required).');
+      return;
+    }
+
     const orderData = {
       pharmacyId,
-      medications: orderForm.medications.filter(med => med.name.trim()),
-      deliveryAddress: orderForm.deliveryAddress,
-      notes: orderForm.notes,
-      totalAmount: orderForm.medications.reduce((sum, med) => sum + (med.quantity * 100), 0) // Simple calculation
+      medications: validMedications,
+      deliveryAddress: {
+        street: orderForm.deliveryAddress.street,
+        city: orderForm.deliveryAddress.city,
+        kebele: orderForm.deliveryAddress.kebele || '',
+        postalCode: orderForm.deliveryAddress.postalCode || ''
+      },
+      notes: orderForm.notes || '',
+      totalAmount: validMedications.reduce((sum, med) => sum + (med.quantity * 100), 0) // Simple calculation
     };
+
+    console.log('Submitting order with data:', orderData);
 
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders`, {
       method: 'POST',
@@ -1250,7 +1269,10 @@ const submitOrderToPharmacy = async (pharmacyId) => {
       body: JSON.stringify(orderData)
     });
 
+    console.log('Order response status:', response.status);
+    
     const data = await response.json();
+    console.log('Order response data:', data);
     
     if (data.success) {
       alert('Order submitted successfully! The pharmacy will prepare your order.');
