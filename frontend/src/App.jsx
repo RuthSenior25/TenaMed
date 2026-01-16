@@ -1294,10 +1294,16 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     console.error('Error details:', {
       message: error.message,
       status: error.response?.status,
-      data: error.response?.data
+      data: error.response?.data,
+      stack: error.stack
     });
     
-    if (error.response?.status === 400) {
+    // Better network error detection
+    if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+      alert('Network error: Unable to connect to the server. Please check:\n1. Your internet connection\n2. Backend server is running\n3. Try again in a few minutes');
+    } else if (error.response?.status === 429) {
+      alert('Too many requests. Please wait a moment and try again.');
+    } else if (error.response?.status === 400) {
       alert('Order validation failed: ' + (error.response.data?.message || 'Please check all required fields'));
     } else if (error.response?.status === 401) {
       alert('Authentication failed. Please log in again.');
@@ -1308,7 +1314,7 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     } else if (error.response?.status === 500) {
       alert('Server error. Please try again later.');
     } else {
-      alert('Failed to submit order. Please check your internet connection.');
+      alert('Failed to submit order. Error: ' + error.message);
     }
   } finally {
     setIsSubmittingOrder(false);
