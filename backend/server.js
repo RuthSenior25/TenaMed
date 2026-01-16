@@ -21,6 +21,7 @@ const allowedOrigins = [
   'https://tena-2ocycutxu-ruths-projects-7791b467.vercel.app',
   'https://tena-kdb86m7rw-ruths-projects-7791b467.vercel.app',
   'https://tena-pdhk4uek0-ruths-projects-7791b467.vercel.app',
+  'https://tena-7wka3y73s-ruths-projects-7791b467.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
@@ -30,21 +31,26 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.some(allowedOrigin => 
-      origin === allowedOrigin || 
-      origin.startsWith(allowedOrigin.replace('https://', 'http://'))
-    )) {
+    // Allow all Vercel preview URLs and production URL
+    if (origin.includes('vercel.app') || 
+        origin.includes('localhost:3000') || 
+        origin.includes('localhost:5173')) {
       return callback(null, true);
     }
     
-    const msg = `CORS blocked: ${origin} not allowed`;
-    console.warn(msg);
-    return callback(new Error(msg), false);
+    // Check specific allowed origins as fallback
+    if (allowedOrigins.some(allowedOrigin => 
+      allowedOrigin === origin)) {
+      return callback(null, true);
+    }
+    
+    // Block other origins
+    console.log('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
   credentials: true,
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 // Security middleware
