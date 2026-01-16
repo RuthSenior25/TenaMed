@@ -111,58 +111,11 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('Token found in localStorage, verifying...');
         
-        // For admin token (starts with 'admin-')
-        if (token.startsWith('admin-')) {
-          let adminUser;
-          
-          // Try to get user data from localStorage
-          if (storedUser) {
-            try {
-              adminUser = JSON.parse(storedUser);
-              console.log('Loaded admin user from localStorage');
-            } catch (e) {
-              console.error('Error parsing stored user data:', e);
-            }
-          }
-          
-          // If no valid user in localStorage, create a new one
-          if (!adminUser) {
-            console.log('Creating new admin user object');
-            adminUser = {
-              _id: ADMIN_CREDENTIALS.id,
-              email: ADMIN_CREDENTIALS.email,
-              role: 'admin',
-              firstName: ADMIN_CREDENTIALS.firstName,
-              lastName: ADMIN_CREDENTIALS.lastName,
-              isAdmin: true,
-              isApproved: true,
-              status: 'active'
-            };
-            // Save to localStorage for future use
-            localStorage.setItem('user', JSON.stringify(adminUser));
-          }
-          
-          // Update axios headers
-          api.defaults.headers.common['Authorization'] = token;
-          
-          if (isMounted) {
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: { 
-                user: adminUser, 
-                token 
-              },
-            });
-            console.log('Admin authentication successful');
-          }
-          return;
-        }
-        
-        // For regular users, verify the token and get profile
+        // For regular users, verify token and get profile
         const response = await authAPI.verifyToken();
         
         if (isMounted) {
-          // Then get the full user profile
+          // Then get full user profile
           const profileResponse = await authAPI.getProfile();
           
           dispatch({
@@ -216,96 +169,9 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOGIN_START' });
       
-      // Check for admin login
       console.log('Login attempt:', credentials.email);
-      console.log('Comparing with admin credentials:', {
-        inputEmail: credentials.email,
-        inputPassword: credentials.password,
-        storedEmail: ADMIN_CREDENTIALS.email,
-        storedPassword: ADMIN_CREDENTIALS.password,
-        emailMatch: credentials.email === ADMIN_CREDENTIALS.email,
-        passwordMatch: credentials.password === ADMIN_CREDENTIALS.password
-      });
       
-      if (credentials.email === ADMIN_CREDENTIALS.email && 
-          credentials.password === ADMIN_CREDENTIALS.password) {
-        
-        console.log('Admin login detected - using hardcoded credentials');
-        
-        const adminUser = {
-          _id: ADMIN_CREDENTIALS.id,
-          email: ADMIN_CREDENTIALS.email,
-          role: 'admin',
-          firstName: ADMIN_CREDENTIALS.firstName,
-          lastName: ADMIN_CREDENTIALS.lastName,
-          isAdmin: true,
-          isApproved: true,
-          status: 'active'
-        };
-        
-        // For admin, we'll use a JWT-like token that the backend can recognize
-        // This should match the backend's JWT secret and format
-        const adminToken = 'admin-001';
-        
-        console.log('Storing admin token in localStorage');
-        localStorage.setItem('token', adminToken);
-        localStorage.setItem('user', JSON.stringify(adminUser));
-        
-        console.log('Token stored. Verifying:', {
-          tokenInStorage: localStorage.getItem('token'),
-          userInStorage: localStorage.getItem('user')
-        });
-        
-        // Update axios default headers
-        api.defaults.headers.common['Authorization'] = adminToken;
-        
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: { 
-            user: adminUser, 
-            token: adminToken,
-          },
-        });
-        
-        toast.success(`Welcome back, Administrator!`);
-        return { success: true };
-      }
-      
-      // Check for government login
-      if (credentials.email === GOVERNMENT_CREDENTIALS.email && 
-          credentials.password === GOVERNMENT_CREDENTIALS.password) {
-        
-        const governmentUser = {
-          _id: GOVERNMENT_CREDENTIALS.id,
-          email: GOVERNMENT_CREDENTIALS.email,
-          role: GOVERNMENT_CREDENTIALS.role,
-          firstName: GOVERNMENT_CREDENTIALS.firstName,
-          lastName: GOVERNMENT_CREDENTIALS.lastName,
-          isApproved: true,
-          status: 'active'
-        };
-        
-        // Use a JWT-like token for government user
-        const govToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJnb3YtMDAxIiwiZW1haWwiOiJnb3Zlcm5tZW50QGV4YW1wbGUuY29tIiwicm9sZSI6ImdvdmVybm1lbnQiLCJpYXQiOjE2OTQzODk2MDAsImV4cCI6MTcyNTkyNTYwMH0.8x7vN1Y3b7JcT1w0ZxY9vLmNpQw2Er4tUvWxYzA`;
-        
-        localStorage.setItem('token', govToken);
-        localStorage.setItem('user', JSON.stringify(governmentUser));
-        
-        // Update axios default headers
-        if (api && api.defaults && api.defaults.headers) {
-          api.defaults.headers.common['Authorization'] = `Bearer ${govToken}`;
-        }
-        
-        dispatch({
-          type: 'LOGIN_SUCCESS',
-          payload: { user: governmentUser, token: govToken },
-        });
-        
-        toast.success(`Welcome, ${GOVERNMENT_CREDENTIALS.firstName} ${GOVERNMENT_CREDENTIALS.lastName}!`);
-        return { success: true };
-      }
-      
-      // Regular user login
+      // Direct API login - no hardcoded credential checks
       const response = await authAPI.login(credentials);
       
       if (!response.data || !response.data.token) {
@@ -343,18 +209,20 @@ export const AuthProvider = ({ children }) => {
 
       // Customize welcome message based on user role
       const roleMessages = {
+        admin: 'Administrator',
         government: 'Government Official',
         pharmacy: 'Pharmacy Owner',
         dispatcher: 'Delivery Person',
         supplier: 'Medicine Supplier',
         patient: 'Patient'
       };
-      
-      const roleMessage = roleMessages[user.role] || '';
-      toast.success(`Welcome back, ${user.firstName || 'User'}! ${roleMessage ? `(${roleMessage})` : ''}`);
+
+      const roleName = roleMessages[userWithProfile.role] || 'User';
+      toast.success(`Welcome back, ${userWithProfile.profile?.firstName || userWithProfile.email}!`);
       
       return { success: true };
     } catch (error) {
+      console.error('Login API error:', error);
       console.error('Login error:', error);
       
       // Clear any invalid token
