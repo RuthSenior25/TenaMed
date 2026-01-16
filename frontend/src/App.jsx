@@ -1270,6 +1270,7 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     });
 
     console.log('Order response status:', response.status);
+    console.log('Order response headers:', response.headers);
     
     const data = await response.json();
     console.log('Order response data:', data);
@@ -1290,7 +1291,25 @@ const submitOrderToPharmacy = async (pharmacyId) => {
     }
   } catch (error) {
     console.error('Error submitting order:', error);
-    alert('Failed to submit order. Please try again.');
+    console.error('Error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+    
+    if (error.response?.status === 400) {
+      alert('Order validation failed: ' + (error.response.data?.message || 'Please check all required fields'));
+    } else if (error.response?.status === 401) {
+      alert('Authentication failed. Please log in again.');
+    } else if (error.response?.status === 403) {
+      alert('You are not authorized to place orders.');
+    } else if (error.response?.status === 404) {
+      alert('Pharmacy not found or not approved.');
+    } else if (error.response?.status === 500) {
+      alert('Server error. Please try again later.');
+    } else {
+      alert('Failed to submit order. Please check your internet connection.');
+    }
   } finally {
     setIsSubmittingOrder(false);
   }
