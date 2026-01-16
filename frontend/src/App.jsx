@@ -480,7 +480,8 @@ const [locationFilter, setLocationFilter] = useState({
   city: '',
   radius: 10
 });
-const [prescriptions, setPrescriptions] = useState([]);
+// Prescriptions functionality removed - endpoint doesn't exist
+// const [prescriptions, setPrescriptions] = useState([]);
 const [orders, setOrders] = useState([]);
 const [deliveries, setDeliveries] = useState([]);
 const [alerts, setAlerts] = useState([]);
@@ -512,10 +513,10 @@ pharmacies: priceBoard[med.id] && priceBoard[med.id].length > 0 ? priceBoard[med
 );
 
 const statCards = [
-{ label: 'Active Prescriptions', value: prescriptions.length },
 { label: 'Open Orders', value: orders.filter((o) => o.status !== 'Delivered').length },
 { label: 'Deliveries Today', value: deliveries.filter((d) => d.status !== 'Delivered').length },
 { label: 'Nearby Pharmacies', value: 'Find Now', isAction: true, action: () => setActivePanel('pharmacies') },
+{ label: 'Medicine Search', value: 'Search', isAction: true, action: () => setActivePanel('search') }
 ];
 
 // Get user's current location
@@ -658,7 +659,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 const fetchPatientProfile = async () => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/patient/profile`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/me`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
@@ -793,7 +794,7 @@ useEffect(() => {
 
   fetchApprovedPharmacies();
   fetchPatientProfile();
-  fetchPrescriptions();
+  // fetchPrescriptions(); // Removed - endpoint doesn't exist
   fetchOrders();
   fetchDeliveries();
 }, [userLocation, locationFilter, approvedPharmacies]); // Re-fetch when location or pharmacies change
@@ -1912,65 +1913,18 @@ return (
   )}
 </div>
 );
-case 'prescriptions':
+case 'search':
 return (
-<div style={{ display: 'grid', gap: '18px' }}>
-<form onSubmit={handlePrescriptionSubmit} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Add Prescription</h4>
-<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-<input
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Medication name"
-value={prescriptionForm.drug}
-onChange={(e) => setPrescriptionForm(prev => ({ ...prev, drug: e.target.value }))}
-/>
-<input
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Dosage (e.g., 500mg)"
-value={prescriptionForm.dosage}
-onChange={(e) => setPrescriptionForm(prev => ({ ...prev, dosage: e.target.value }))}
-/>
-<input
-style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-placeholder="Frequency (e.g., 2x daily)"
-value={prescriptionForm.frequency}
-onChange={(e) => setPrescriptionForm(prev => ({ ...prev, frequency: e.target.value }))}
-/>
-</div>
-<textarea
-style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', minHeight: '80px', marginBottom: '12px' }}
-placeholder="Additional notes..."
-value={prescriptionForm.notes}
-onChange={(e) => setPrescriptionForm(prev => ({ ...prev, notes: e.target.value }))}
-/>
-<button type="submit" style={{ ...buttonBaseStyle, background: '#38a169' }}>Add Prescription</button>
-</form>
-
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Your Prescriptions</h4>
-{prescriptions.length === 0 ? (
-<p style={{ margin: 0, color: '#a0aec0' }}>No prescriptions yet.</p>
-) : (
-<div style={{ display: 'grid', gap: '12px' }}>
-{prescriptions.map((prescription) => (
-<div key={prescription.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<div>
-<div style={{ fontWeight: 600, color: '#2d3748' }}>{prescription.drug}</div>
-<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{prescription.dosage} • {prescription.frequency}</p>
-{prescription.notes && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>{prescription.notes}</p>}
-</div>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Global Medicine Search</h4>
+<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>Search for medicines across all pharmacies</p>
 <div style={{ display: 'flex', gap: '8px' }}>
 <button style={{ ...buttonBaseStyle, background: '#2563eb' }} onClick={() => setActivePanel('medicines')}>
 Order Medicine
 </button>
 <button style={{ ...buttonBaseStyle, background: '#f59e0b' }}>
-Request Refill
+View Catalog
 </button>
-</div>
-</div>
-))}
-</div>
-)}
 </div>
 </div>
 );
