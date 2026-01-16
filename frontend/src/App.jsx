@@ -542,13 +542,8 @@ const getUserLocation = () => {
   }
 };
 
-// Request location permission once and get user location
+// Request location permission and get user location
 const requestLocationPermissionOnce = () => {
-  const hasAsked = localStorage.getItem('locationPermissionAsked');
-  if (hasAsked || locationPermissionAsked) {
-    return; // Already asked, don't ask again
-  }
-
   if ('geolocation' in navigator) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
