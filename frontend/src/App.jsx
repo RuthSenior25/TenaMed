@@ -1778,6 +1778,93 @@ return (
 )}
 </div>
 );
+case 'approved-pharmacies':
+return (
+<div style={{ padding: '16px' }}>
+  <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>🏥 Approved Pharmacies</h3>
+  
+  {isLoadingPharmacies ? (
+    <div style={{ textAlign: 'center', padding: '40px' }}>
+      <div style={{ 
+        display: 'inline-block',
+        width: '40px',
+        height: '40px',
+        border: '4px solid #e2e8f0',
+        borderTop: '4px solid #3b82f6',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite'
+      }}></div>
+      <p style={{ marginTop: '16px', color: '#718096' }}>Loading pharmacies...</p>
+    </div>
+  ) : approvedPharmacies.length === 0 ? (
+    <div style={{ textAlign: 'center', padding: '40px' }}>
+      <p style={{ color: '#718096' }}>No approved pharmacies found.</p>
+    </div>
+  ) : (
+    <div style={{ display: 'grid', gap: '16px' }}>
+      {approvedPharmacies.map((pharmacy) => (
+        <div key={pharmacy._id} style={{ 
+          border: '1px solid #e2e8f0', 
+          borderRadius: '12px', 
+          padding: '16px',
+          backgroundColor: '#ffffff'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: '0 0 8px', color: '#2d3748', fontSize: '18px' }}>
+                {pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
+              </h4>
+              <p style={{ margin: '4px 0', color: '#718096', fontSize: '14px' }}>
+                📍 {pharmacy.pharmacyLocation?.address || 'Address not available'}
+              </p>
+              <p style={{ margin: '4px 0', color: '#718096', fontSize: '14px' }}>
+                🏙️ {pharmacy.pharmacyLocation?.city || 'City not available'}
+              </p>
+              <p style={{ margin: '4px 0', color: '#718096', fontSize: '14px' }}>
+                📞 {pharmacy.profile?.phone || 'Phone not available'}
+              </p>
+              <p style={{ margin: '4px 0', color: '#718096', fontSize: '14px' }}>
+                ✉️ {pharmacy.email}
+              </p>
+              {userLocation && pharmacy.pharmacyLocation && (
+                <p style={{ margin: '4px 0', color: '#718096', fontSize: '14px' }}>
+                  📏 {calculateDistance(
+                    userLocation.lat, 
+                    userLocation.lng, 
+                    pharmacy.pharmacyLocation.lat, 
+                    pharmacy.pharmacyLocation.lng
+                  ).toFixed(1)} km away
+                </p>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={() => {
+                  setSelectedPharmacy(pharmacy);
+                  setShowOrderTrackModal(true);
+                }}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Order
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+);
 case 'prescriptions':
 return (
 <div style={{ display: 'grid', gap: '18px' }}>
@@ -2200,12 +2287,12 @@ View Profile
       width: '100%'
     }}>
       <h3 style={{ margin: '0 0 24px', color: '#2d3748', fontSize: '24px', fontWeight: '700' }}>
-        What would you like to do?
+        Place Your Order
       </h3>
       
       <div style={{ marginBottom: '24px' }}>
         <p style={{ margin: '0 0 16px', color: '#718096', fontSize: '16px' }}>
-          Choose an action for <strong>{selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}</strong>
+          Ready to order from <strong>{selectedPharmacy.pharmacyName || `${selectedPharmacy.profile?.firstName}'s Pharmacy`}</strong>
         </p>
       </div>
       
@@ -2232,7 +2319,7 @@ View Profile
             gap: '8px'
           }}
         >
-          📦 Place Order
+          📦 Order
         </button>
         
         <button
