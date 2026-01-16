@@ -2002,50 +2002,6 @@ Mark Received
 ))}
 </div>
 );
-case 'profile':
-return (
-<div style={{ display: 'grid', gap: '18px' }}>
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>My Profile</h4>
-{patientProfile ? (
-<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-<div>
-<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Personal Information</h5>
-<p><strong>Name:</strong> {patientProfile.profile?.firstName} {patientProfile.profile?.lastName}</p>
-<p><strong>Email:</strong> {patientProfile.email}</p>
-<p><strong>Phone:</strong> {patientProfile.profile?.phone}</p>
-<p><strong>Date of Birth:</strong> {patientProfile.profile?.dateOfBirth || 'Not set'}</p>
-<p><strong>Gender:</strong> {patientProfile.profile?.gender || 'Not set'}</p>
-</div>
-<div>
-<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Medical Information</h5>
-<p><strong>Blood Type:</strong> {patientProfile.profile?.medicalInfo?.bloodType || 'Not set'}</p>
-<p><strong>Allergies:</strong> {patientProfile.profile?.medicalInfo?.allergies?.join(', ') || 'None'}</p>
-<p><strong>Chronic Conditions:</strong> {patientProfile.profile?.medicalInfo?.chronicConditions?.join(', ') || 'None'}</p>
-</div>
-<div>
-<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Emergency Contact</h5>
-<p><strong>Name:</strong> {patientProfile.profile?.emergencyContact?.name || 'Not set'}</p>
-<p><strong>Phone:</strong> {patientProfile.profile?.emergencyContact?.phone || 'Not set'}</p>
-<p><strong>Relationship:</strong> {patientProfile.profile?.emergencyContact?.relationship || 'Not set'}</p>
-</div>
-<div>
-<h5 style={{ margin: '0 0 8px', color: '#374151' }}>Addresses</h5>
-{patientProfile.profile?.addresses?.map((address, index) => (
-<div key={index} style={{ marginBottom: '8px', padding: '8px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-<p style={{ margin: 0 }}><strong>{address.type}:</strong></p>
-<p style={{ margin: 0 }}>{address.street}, {address.city}</p>
-<p style={{ margin: 0 }}>{address.kebele}, {address.postalCode}</p>
-</div>
-))}
-</div>
-</div>
-) : (
-<p style={{ margin: 0, color: '#a0aec0' }}>Loading profile...</p>
-)}
-</div>
-</div>
-);
 default:
 return null;
 }
@@ -2245,13 +2201,6 @@ View Pharmacies
 <p style={cardBodyStyle}>Confirm when a courier drops off your package.</p>
 <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
 View Deliveries
-</button>
-</div>
-<div style={cardBaseStyle}>
-<h3 style={cardTitleStyle}>My Profile</h3>
-<p style={cardBodyStyle}>View and manage your personal and medical information.</p>
-<button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
-View Profile
 </button>
 </div>
 </div>
@@ -4350,46 +4299,6 @@ const DeliveryDashboard = () => {
           </div>
         );
 
-      case 'profile':
-        return (
-          <div style={{ display: 'grid', gap: '16px' }}>
-            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>My Profile</h3>
-            {profile ? (
-              <div style={cardBaseStyle}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Personal Information</h4>
-                    <p><strong>Name:</strong> {profile.profile?.firstName} {profile.profile?.lastName}</p>
-                    <p><strong>Email:</strong> {profile.email}</p>
-                    <p><strong>Phone:</strong> {profile.profile?.phone}</p>
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Vehicle Information</h4>
-                    <p><strong>Type:</strong> {profile.profile?.vehicleInfo?.type}</p>
-                    <p><strong>Plate:</strong> {profile.profile?.vehicleInfo?.plateNumber}</p>
-                    <p><strong>Model:</strong> {profile.profile?.vehicleInfo?.make} {profile.profile?.vehicleInfo?.model}</p>
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 8px', color: '#374151' }}>Performance</h4>
-                    <p><strong>Total Deliveries:</strong> {profile.profile?.performance?.totalDeliveries || 0}</p>
-                    <p><strong>Average Rating:</strong> ⭐ {profile.profile?.performance?.averageRating || 0}</p>
-                    <p><strong>On-Time Rate:</strong> {profile.profile?.performance?.onTimeDeliveryRate || 0}%</p>
-                  </div>
-                </div>
-                {currentLocation && (
-                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f0f9ff', borderRadius: '8px' }}>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#0c4a6e' }}>
-                      📍 Current Location: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p style={{ margin: 0, color: '#a0aec0' }}>Loading profile...</p>
-            )}
-          </div>
-        );
-
       default:
         return null;
     }
@@ -4453,13 +4362,6 @@ const DeliveryDashboard = () => {
             <p style={cardBodyStyle}>See your completed deliveries for today</p>
             <button style={actionButtonStyle(activePanel === 'completed', '#10b981')} onClick={() => setActivePanel('completed')}>
               View Completed ({completedOrders.length})
-            </button>
-          </div>
-          <div style={cardBaseStyle}>
-            <h3 style={cardTitleStyle}>My Profile</h3>
-            <p style={cardBodyStyle}>View and update your delivery profile</p>
-            <button style={actionButtonStyle(activePanel === 'profile', '#6366f1')} onClick={() => setActivePanel('profile')}>
-              View Profile
             </button>
           </div>
         </div>
