@@ -477,38 +477,16 @@ router.get('/approved-pharmacies', async (req, res) => {
       city 
     } = req.query;
     
+    // First, get all approved pharmacies without location filtering
     let query = { 
       role: 'pharmacy', 
       status: 'approved',
       isActive: true 
     };
     
-    // If location coordinates are provided, add geospatial filtering
-    if (lat && lng) {
-      const userLat = parseFloat(lat);
-      const userLng = parseFloat(lng);
-      const searchRadius = parseFloat(radius) || 10;
-      
-      // Find pharmacies within radius (simplified distance calculation)
-      query['pharmacyLocation.coordinates.1'] = { // lat is at index 1 in [lng, lat] array
-        $gte: userLat - (searchRadius / 111), // Approximate degrees
-        $lte: userLat + (searchRadius / 111)
-      };
-      query['pharmacyLocation.coordinates.0'] = { // lng is at index 0 in [lng, lat] array
-        $gte: userLng - (searchRadius / (111 * Math.cos(userLat * Math.PI / 180))),
-        $lte: userLng + (searchRadius / (111 * Math.cos(userLat * Math.PI / 180)))
-      };
-    } else if (city) {
-      // Filter by city if no coordinates provided
-      query['pharmacyLocation.city'] = { 
-        $regex: city, 
-        $options: 'i' 
-      };
-    }
-    
     const approvedPharmacies = await User.find(query)
       .select('email profile pharmacyName pharmacyLocation')
-      .sort({ 'pharmacyLocation.city': 1 });
+      .sort({ pharmacyName: 1 }); // Sort by name
 
     console.log('Found approved pharmacies:', approvedPharmacies.length); // Debug log
 
