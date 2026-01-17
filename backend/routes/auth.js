@@ -472,7 +472,7 @@ router.get('/approved-pharmacies', async (req, res) => {
     
     // First, let's see ALL pharmacies to debug
     const allPharmacies = await User.find({ role: 'pharmacy' })
-      .select('email pharmacyName status isApproved isActive')
+      .select('email pharmacyName status isApproved isActive pharmacyLocation')
       .sort({ pharmacyName: 1 });
     
     console.log('ALL pharmacies in database:', allPharmacies.map(p => ({
@@ -480,7 +480,14 @@ router.get('/approved-pharmacies', async (req, res) => {
       email: p.email,
       status: p.status,
       isApproved: p.isApproved,
-      isActive: p.isActive
+      isActive: p.isActive,
+      hasLocation: !!p.pharmacyLocation,
+      locationDetails: p.pharmacyLocation ? {
+        hasCoordinates: !!p.pharmacyLocation.coordinates,
+        coordinates: p.pharmacyLocation.coordinates,
+        address: p.pharmacyLocation.address,
+        city: p.pharmacyLocation.city
+      } : null
     })));
     
     // Now get only approved ones
