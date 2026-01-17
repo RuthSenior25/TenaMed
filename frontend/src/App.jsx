@@ -783,15 +783,20 @@ const fetchApprovedPharmacies = async () => {
 };
 
 useEffect(() => {
-  // Request location permission once on component mount
-  requestLocationPermissionOnce();
-
   fetchApprovedPharmacies();
   fetchPatientProfile();
   // fetchPrescriptions(); // Removed - endpoint doesn't exist
   fetchOrders();
   fetchDeliveries();
-}, [userLocation, locationFilter, approvedPharmacies]); // Re-fetch when location or pharmacies change
+}, []); // Only run on mount, not when location changes
+
+// Separate useEffect to handle location-based updates
+useEffect(() => {
+  if (userLocation) {
+    // Re-fetch pharmacies when location changes to update distances
+    fetchApprovedPharmacies();
+  }
+}, [userLocation]);
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
