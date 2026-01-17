@@ -49,7 +49,7 @@ router.get('/me', authenticate, (req, res) => {
 // Register new user
 router.post('/register', validateUserRegistration, async (req, res) => {
   try {
-    const { username, email, password, role, profile, pharmacyName } = req.body;
+    const { username, email, password, role, profile, pharmacyName, location } = req.body;
 
     // Log the incoming request for debugging
     console.log('Registration attempt:', { 
@@ -57,7 +57,8 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       email, 
       role,
       hasProfile: !!profile,
-      pharmacyName 
+      pharmacyName,
+      hasLocation: !!location
     });
 
     // Check if user already exists
@@ -94,6 +95,21 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     // Add pharmacy name if role is pharmacy
     if (role === 'pharmacy') {
       userData.pharmacyName = pharmacyName;
+      
+      // Add pharmacy location if provided
+      if (location && location.type === 'Point' && location.coordinates) {
+        userData.pharmacyLocation = {
+          type: 'Point',
+          coordinates: {
+            lat: location.coordinates[1], // Convert from [lng, lat] to lat
+            lng: location.coordinates[0]  // Convert from [lng, lat] to lng
+          },
+          address: profile?.address || '',
+          city: profile?.city || '',
+          postalCode: profile?.zipCode || ''
+        };
+        console.log('Saving pharmacy location:', userData.pharmacyLocation);
+      }
     }
 
     // Create new user
