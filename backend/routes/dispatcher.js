@@ -10,7 +10,7 @@ const Pharmacy = require('../models/Pharmacy');
 router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const orders = await Order.find({ 
-      status: 'confirmed',
+      status: 'ready',
       deliveryStatus: 'pending'
     })
     .populate('pharmacyId', 'pharmacyName email profile')
