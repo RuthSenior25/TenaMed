@@ -71,14 +71,24 @@ const Register = () => {
       // Add pharmacy-specific data
       if (data.role === 'pharmacy') {
         registrationData.pharmacyName = pharmacyName.trim();
-        console.log('Pharmacy location before saving:', pharmacyLocation); // Debug log
-        if (pharmacyLocation) {
-          registrationData.location = {
-            type: 'Point',
-            coordinates: [pharmacyLocation.lng, pharmacyLocation.lat] // MongoDB expects [longitude, latitude]
-          };
-          console.log('Location data being sent:', registrationData.location); // Debug log
+        
+        // Location is REQUIRED for pharmacies
+        if (!pharmacyLocation) {
+          toast.error('Please select your pharmacy location on the map');
+          setIsLoading(false);
+          return;
         }
+        
+        // Save location data
+        registrationData.location = {
+          type: 'Point',
+          coordinates: [pharmacyLocation.lng, pharmacyLocation.lat] // MongoDB expects [longitude, latitude]
+        };
+        
+        console.log('Pharmacy location being saved:', {
+          pharmacyName: pharmacyName,
+          location: registrationData.location
+        });
       }
 
       console.log('Sending registration data:', registrationData);
