@@ -49,8 +49,8 @@ const userSchema = new mongoose.Schema({
     kebele: { type: String },
     postalCode: { type: String },
     coordinates: {
-      lat: { type: Number },
-      lng: { type: Number }
+      type: [Number], // [lng, lat] format for MongoDB
+      default: [0, 0]
     }
   },
   status: {
