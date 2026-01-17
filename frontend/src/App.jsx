@@ -1063,6 +1063,31 @@ const handlePrescriptionSubmit = async (event) => {
   }
 };
 
+// Handle order from search results
+const handleOrderFromSearch = (searchResult) => {
+  console.log('Ordering from search result:', searchResult);
+  
+  // Set the order form with the selected medicine and pharmacy
+  setOrderForm({
+    medications: [{
+      name: searchResult.medicineName,
+      quantity: 1,
+      price: searchResult.price
+    }],
+    selectedPharmacy: searchResult.pharmacyName,
+    pharmacyId: searchResult.pharmacyId,
+    deliveryAddress: patientProfile?.address || {
+      street: '',
+      city: '',
+      postalCode: ''
+    }
+  });
+  
+  // Switch to order panel
+  setActivePanel('orders');
+  recordAlert(`Ready to order ${searchResult.medicineName} from ${searchResult.pharmacyName}`);
+};
+
 const handleOrderSubmit = async (event) => {
   event.preventDefault();
   
@@ -2125,6 +2150,25 @@ Logout
             <div style={{ fontSize: '14px', color: '#4a5568', fontWeight: '500' }}>
               💊 {result.medicineName}
             </div>
+            {result.quantity > 0 && (
+              <button
+                onClick={() => handleOrderFromSearch(result)}
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                🛒 Order from {result.pharmacyName}
+              </button>
+            )}
           </div>
         ))}
       </div>
