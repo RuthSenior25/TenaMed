@@ -768,10 +768,15 @@ const fetchApprovedPharmacies = async () => {
     
     console.log('Response status:', response.status); // Debug log
     const data = await response.json();
-    console.log('Approved pharmacies response:', data); // Debug log
+    console.log('Pharmacies data received:', data); // Debug log
+    console.log('User location:', userLocation); // Debug log
     
     if (data.success) {
-      setApprovedPharmacies(data.pharmacies || []);
+      setApprovedPharmacies(data.data || []);
+      console.log('Pharmacy locations:', data.data?.map(p => ({
+        name: p.pharmacyName,
+        location: p.pharmacyLocation
+      }))); // Debug pharmacy locations
     } else {
       console.error('API returned error:', data.message);
     }
