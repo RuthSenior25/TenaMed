@@ -858,80 +858,18 @@ const searchGlobalMedicines = async (medicineName) => {
   try {
     const token = localStorage.getItem('token');
     const results = [];
-    
-    // Fallback: Use base medicine catalog if API fails
-    const fallbackResults = [];
     const searchTerm = medicineName.trim().toLowerCase();
     
-    // Create fallback results using comprehensive pharmacy inventory data
-    const pharmacyInventoryData = {
-      'Amoxicillin 500mg': {
-        'Addis Lifeline Pharmacy': { price: 110, quantity: 50 },
-        'CMC Community Pharmacy': { price: 125, quantity: 30 },
-        'Lafto Prime Pharmacy': { price: 115, quantity: 75 },
-        'Bole Meda Pharmacy': { price: 120, quantity: 40 },
-        'Mekane Yesus Pharmacy': { price: 105, quantity: 60 }
-      },
-      'Metformin 850mg': {
-        'Addis Lifeline Pharmacy': { price: 85, quantity: 40 },
-        'CMC Community Pharmacy': { price: 95, quantity: 60 },
-        'Lafto Prime Pharmacy': { price: 90, quantity: 25 },
-        'Bole Meda Pharmacy': { price: 88, quantity: 45 },
-        'Mekane Yesus Pharmacy': { price: 92, quantity: 35 }
-      },
-      'Insulin Pen (Rapid)': {
-        'Addis Lifeline Pharmacy': { price: 420, quantity: 15 },
-        'CMC Community Pharmacy': { price: 460, quantity: 20 },
-        'Lafto Prime Pharmacy': { price: 440, quantity: 10 },
-        'Bole Meda Pharmacy': { price: 450, quantity: 12 },
-        'Mekane Yesus Pharmacy': { price: 430, quantity: 18 }
-      },
-      'Ibuprofen 200mg': {
-        'Addis Lifeline Pharmacy': { price: 25, quantity: 100 },
-        'CMC Community Pharmacy': { price: 30, quantity: 80 },
-        'Lafto Prime Pharmacy': { price: 28, quantity: 120 },
-        'Bole Meda Pharmacy': { price: 27, quantity: 90 },
-        'Mekane Yesus Pharmacy': { price: 26, quantity: 110 }
-      },
-      'Paracetamol 500mg': {
-        'Addis Lifeline Pharmacy': { price: 15, quantity: 200 },
-        'CMC Community Pharmacy': { price: 18, quantity: 150 },
-        'Lafto Prime Pharmacy': { price: 16, quantity: 180 },
-        'Bole Meda Pharmacy': { price: 17, quantity: 160 },
-        'Mekane Yesus Pharmacy': { price: 14, quantity: 190 }
-      },
-      'Vitamin D3 1000IU': {
-        'Addis Lifeline Pharmacy': { price: 45, quantity: 60 },
-        'CMC Community Pharmacy': { price: 50, quantity: 40 },
-        'Lafto Prime Pharmacy': { price: 48, quantity: 55 },
-        'Bole Meda Pharmacy': { price: 47, quantity: 65 },
-        'Mekane Yesus Pharmacy': { price: 46, quantity: 70 }
-      },
-      'Omeprazole 20mg': {
-        'Addis Lifeline Pharmacy': { price: 35, quantity: 80 },
-        'CMC Community Pharmacy': { price: 40, quantity: 60 },
-        'Lafto Prime Pharmacy': { price: 38, quantity: 70 },
-        'Bole Meda Pharmacy': { price: 37, quantity: 75 },
-        'Mekane Yesus Pharmacy': { price: 36, quantity: 85 }
-      },
-      'Lisinopril 10mg': {
-        'Addis Lifeline Pharmacy': { price: 55, quantity: 45 },
-        'CMC Community Pharmacy': { price: 60, quantity: 35 },
-        'Lafto Prime Pharmacy': { price: 58, quantity: 40 },
-        'Bole Meda Pharmacy': { price: 57, quantity: 50 },
-        'Mekane Yesus Pharmacy': { price: 56, quantity: 48 }
-      },
-      'Atorvastatin 20mg': {
-        'Addis Lifeline Pharmacy': { price: 75, quantity: 55 },
-        'CMC Community Pharmacy': { price: 80, quantity: 45 },
-        'Lafto Prime Pharmacy': { price: 78, quantity: 50 },
-        'Bole Meda Pharmacy': { price: 77, quantity: 60 },
-        'Mekane Yesus Pharmacy': { price: 76, quantity: 52 }
-      }
-    };
-    
-    // Check if medicine exists in our inventory data
-    const medicineData = pharmacyInventoryData[medicineName];
+    // Search through all approved pharmacies for the medicine
+    for (const pharmacy of approvedPharmacies) {
+      try {
+        // Fetch pharmacy inventory to search for medicines
+        const inventoryResponse = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/inventory/${pharmacy._id}`, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json'
+          }
+        });
     if (medicineData) {
       // Create results for each pharmacy that has this medicine
       approvedPharmacies.forEach(pharmacy => {
