@@ -573,21 +573,21 @@ const requestLocationPermissionOnce = () => {
           gap: 8px;
         `;
         successDiv.innerHTML = `
-          <div style="font-size: 16px;">✅</div>
+          <div style="font-size: 16px;">📍</div>
           <div>
-            <div style="color: #065f46; font-size: 12px; font-weight: 600;">Location Found!</div>
-            <div style="color: #047857; font-size: 11px;">Showing nearby pharmacies with distances</div>
+            <div style="color: #065f46; font-size: 12px; font-weight: 600;">Location Enabled</div>
+            <div style="color: #047857; font-size: 11px;">Showing nearby pharmacies</div>
           </div>
         `;
         
         document.body.appendChild(successDiv);
         
-        // Auto-remove after 3 seconds
+        // Auto-remove after 2 seconds
         setTimeout(() => {
           if (document.body.contains(successDiv)) {
             document.body.removeChild(successDiv);
           }
-        }, 3000);
+        }, 2000);
       },
       (error) => {
         console.error('Error getting location:', error);
@@ -802,6 +802,43 @@ useEffect(() => {
     fetchApprovedPharmacies();
   }
 }, [userLocation]);
+
+// Sort pharmacies by distance when location is available
+useEffect(() => {
+  if (userLocation && approvedPharmacies.length > 0) {
+    const sortedPharmacies = [...approvedPharmacies].sort((a, b) => {
+      let distanceA = null;
+      let distanceB = null;
+      
+      // Calculate distance for pharmacy A
+      if (a.pharmacyLocation?.coordinates) {
+        const coordsA = a.pharmacyLocation.coordinates;
+        if (Array.isArray(coordsA)) {
+          const pharmacyLngA = coordsA[0];
+          const pharmacyLatA = coordsA[1];
+          distanceA = calculateDistance(userLocation.lat, userLocation.lng, pharmacyLatA, pharmacyLngA);
+        }
+      }
+      
+      // Calculate distance for pharmacy B
+      if (b.pharmacyLocation?.coordinates) {
+        const coordsB = b.pharmacyLocation.coordinates;
+        if (Array.isArray(coordsB)) {
+          const pharmacyLngB = coordsB[0];
+          const pharmacyLatB = coordsB[1];
+          distanceB = calculateDistance(userLocation.lat, userLocation.lng, pharmacyLatB, pharmacyLngB);
+        }
+      }
+      
+      // Sort by distance (null distances go to end)
+      if (distanceA === null) return 1;
+      if (distanceB === null) return -1;
+      return distanceA - distanceB;
+    });
+    
+    setApprovedPharmacies(sortedPharmacies);
+  }
+}, [userLocation, approvedPharmacies.length]);
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
