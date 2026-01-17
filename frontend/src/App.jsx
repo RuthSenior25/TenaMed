@@ -759,6 +759,8 @@ const fetchApprovedPharmacies = async () => {
     
     const url = `${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     
+    console.log('Fetching pharmacies from:', url); // Debug log
+    
     const response = await fetch(url, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
@@ -772,10 +774,13 @@ const fetchApprovedPharmacies = async () => {
     console.log('User location:', userLocation); // Debug log
     
     if (data.success) {
-      setApprovedPharmacies(data.data || []);
-      console.log('Pharmacy locations:', data.data?.map(p => ({
+      const pharmacies = data.data || [];
+      setApprovedPharmacies(pharmacies);
+      console.log('Pharmacy locations:', pharmacies.map(p => ({
         name: p.pharmacyName,
-        location: p.pharmacyLocation
+        location: p.pharmacyLocation,
+        status: p.status,
+        isApproved: p.isApproved
       }))); // Debug pharmacy locations
     } else {
       console.error('API returned error:', data.message);

@@ -490,11 +490,11 @@ router.get('/approved-pharmacies', async (req, res) => {
       const searchRadius = parseFloat(radius) || 10;
       
       // Find pharmacies within radius (simplified distance calculation)
-      query['pharmacyLocation.coordinates.lat'] = {
+      query['pharmacyLocation.coordinates.1'] = { // lat is at index 1 in [lng, lat] array
         $gte: userLat - (searchRadius / 111), // Approximate degrees
         $lte: userLat + (searchRadius / 111)
       };
-      query['pharmacyLocation.coordinates.lng'] = {
+      query['pharmacyLocation.coordinates.0'] = { // lng is at index 0 in [lng, lat] array
         $gte: userLng - (searchRadius / (111 * Math.cos(userLat * Math.PI / 180))),
         $lte: userLng + (searchRadius / (111 * Math.cos(userLat * Math.PI / 180)))
       };
@@ -516,12 +516,12 @@ router.get('/approved-pharmacies', async (req, res) => {
     const pharmaciesWithDistance = approvedPharmacies.map(pharmacy => {
       const pharmacyData = pharmacy.toObject();
       
-      if (lat && lng && pharmacy.pharmacyLocation?.coordinates?.lat && pharmacy.pharmacyLocation?.coordinates?.lng) {
+      if (lat && lng && pharmacy.pharmacyLocation?.coordinates && Array.isArray(pharmacy.pharmacyLocation.coordinates)) {
         // Calculate distance using Haversine formula
         const userLat = parseFloat(lat);
         const userLng = parseFloat(lng);
-        const pharmLat = pharmacy.pharmacyLocation.coordinates.lat;
-        const pharmLng = pharmacy.pharmacyLocation.coordinates.lng;
+        const pharmLng = pharmacy.pharmacyLocation.coordinates[0]; // lng at index 0
+        const pharmLat = pharmacy.pharmacyLocation.coordinates[1]; // lat at index 1
         
         const R = 6371; // Earth's radius in km
         const dLat = (pharmLat - userLat) * Math.PI / 180;
