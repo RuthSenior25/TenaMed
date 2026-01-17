@@ -1736,39 +1736,21 @@ return (
     )}
     <div style={{ display: 'grid', gap: '16px' }}>
       {approvedPharmacies.map((pharmacy) => {
-        // Calculate distance if user location is available
-        let distance = null;
+        // Use distance from backend if available, otherwise calculate on frontend
+        let distance = pharmacy.distance || null;
         
-        // Debug logging
-        console.log('Pharmacy data:', {
-          id: pharmacy._id,
-          name: pharmacy.pharmacyName,
-          location: pharmacy.pharmacyLocation,
-          userLocation: userLocation
-        });
-        
-        if (userLocation && pharmacy.pharmacyLocation) {
-          // Try different possible coordinate field names
+        // If no distance from backend and user location is available, calculate it
+        if (!distance && userLocation && pharmacy.pharmacyLocation) {
           const pharmacyCoords = pharmacy.pharmacyLocation.coordinates;
           let pharmacyLat, pharmacyLng;
           
           if (Array.isArray(pharmacyCoords)) {
-            // MongoDB format: [lng, lat]
             pharmacyLng = pharmacyCoords[0];
             pharmacyLat = pharmacyCoords[1];
-          } else if (pharmacyCoords.lat && pharmacyCoords.lng) {
-            // Object format: {lat, lng}
-            pharmacyLat = pharmacyCoords.lat;
-            pharmacyLng = pharmacyCoords.lng;
           }
           
           if (pharmacyLat && pharmacyLng) {
             distance = calculateDistance(userLocation.lat, userLocation.lng, pharmacyLat, pharmacyLng);
-            
-            console.log('Distance calculated:', {
-              pharmacy: pharmacy.pharmacyName,
-              distance: distance.toFixed(1)
-            });
           }
         }
 
