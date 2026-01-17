@@ -470,28 +470,44 @@ router.get('/approved-pharmacies', async (req, res) => {
   try {
     console.log('Fetching approved pharmacies...'); // Debug log
     
+    // First, let's see ALL pharmacies to debug
+    const allPharmacies = await User.find({ role: 'pharmacy' })
+      .select('email pharmacyName status isApproved isActive')
+      .sort({ pharmacyName: 1 });
+    
+    console.log('ALL pharmacies in database:', allPharmacies.map(p => ({
+      name: p.pharmacyName,
+      email: p.email,
+      status: p.status,
+      isApproved: p.isApproved,
+      isActive: p.isActive
+    })));
+    
+    // Now get only approved ones
+    const approvedPharmacies = allPharmacies.filter(p => 
+      p.status === 'approved' && p.isActive === true
+    );
+    
+    console.log('Approved pharmacies:', approvedPharmacies.length); // Debug log
+
+    // Get full data for approved pharmacies
+    const fullApprovedPharmacies = await User.find({ 
+      role: 'pharmacy', 
+      status: 'approved',
+      isActive: true 
+    })
+      .select('email profile pharmacyName pharmacyLocation')
+      .sort({ pharmacyName: 1 });
+
     const { 
       lat, 
       lng, 
       radius = 10, // Default 10km radius
       city 
     } = req.query;
-    
-    // First, get all approved pharmacies without location filtering
-    let query = { 
-      role: 'pharmacy', 
-      status: 'approved',
-      isActive: true 
-    };
-    
-    const approvedPharmacies = await User.find(query)
-      .select('email profile pharmacyName pharmacyLocation')
-      .sort({ pharmacyName: 1 }); // Sort by name
-
-    console.log('Found approved pharmacies:', approvedPharmacies.length); // Debug log
 
     // Calculate distances if coordinates provided
-    const pharmaciesWithDistance = approvedPharmacies.map(pharmacy => {
+    const pharmaciesWithDistance = fullApprovedPharmacies.map(pharmacy => {
       const pharmacyData = pharmacy.toObject();
       
       if (lat && lng && pharmacy.pharmacyLocation?.coordinates && Array.isArray(pharmacy.pharmacyLocation.coordinates)) {
