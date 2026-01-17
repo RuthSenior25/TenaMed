@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const app = express();
 
-// TenaMed Backend Server - Restart Triggered
+// TenaMed Backend Server - Deployed with Admin Credentials
 // CORS configuration
 const allowedOrigins = [
   'https://tena-med.vercel.app',
