@@ -100,10 +100,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       if (location && location.type === 'Point' && location.coordinates) {
         userData.pharmacyLocation = {
           type: 'Point',
-          coordinates: {
-            lat: location.coordinates[1], // Convert from [lng, lat] to lat
-            lng: location.coordinates[0]  // Convert from [lng, lat] to lng
-          },
+          coordinates: location.coordinates, // Keep as [lng, lat] for MongoDB
           address: profile?.address || '',
           city: profile?.city || '',
           postalCode: profile?.zipCode || ''

@@ -1707,8 +1707,18 @@ return (
         
         if (userLocation && pharmacy.pharmacyLocation) {
           // Try different possible coordinate field names
-          const pharmacyLat = pharmacy.pharmacyLocation.lat || pharmacy.pharmacyLocation.latitude;
-          const pharmacyLng = pharmacy.pharmacyLocation.lng || pharmacy.pharmacyLocation.longitude;
+          const pharmacyCoords = pharmacy.pharmacyLocation.coordinates;
+          let pharmacyLat, pharmacyLng;
+          
+          if (Array.isArray(pharmacyCoords)) {
+            // MongoDB format: [lng, lat]
+            pharmacyLng = pharmacyCoords[0];
+            pharmacyLat = pharmacyCoords[1];
+          } else if (pharmacyCoords.lat && pharmacyCoords.lng) {
+            // Object format: {lat, lng}
+            pharmacyLat = pharmacyCoords.lat;
+            pharmacyLng = pharmacyCoords.lng;
+          }
           
           if (pharmacyLat && pharmacyLng) {
             distance = calculateDistance(userLocation.lat, userLocation.lng, pharmacyLat, pharmacyLng);
