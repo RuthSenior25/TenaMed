@@ -536,7 +536,8 @@ router.get('/approved-pharmacies', async (req, res) => {
 
     res.json({
       success: true,
-      pharmacies: pharmaciesWithDistance,
+      data: pharmaciesWithDistance,
+      pharmacies: pharmaciesWithDistance, // Keep for backward compatibility
       searchCriteria: {
         location: lat && lng ? { lat, lng, radius: `${radius}km` } : null,
         city: city || null
