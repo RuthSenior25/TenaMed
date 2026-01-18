@@ -1368,6 +1368,43 @@ const submitOrderToPharmacy = async (pharmacyId) => {
   }
 };
 
+// Handle order from search results
+const handleOrderFromSearch = (searchResult) => {
+  console.log('Ordering from search result:', searchResult);
+  
+  // Find the pharmacy object from approvedPharmacies
+  const pharmacy = approvedPharmacies.find(p => p._id === searchResult.pharmacyId);
+  
+  if (!pharmacy) {
+    alert('Pharmacy not found. Please try again.');
+    return;
+  }
+  
+  // Set the selected pharmacy and pre-fill the order form
+  setSelectedPharmacy(pharmacy);
+  setOrderForm({
+    medications: [{
+      name: searchResult.medicineName,
+      quantity: 1,
+      instructions: ''
+    }],
+    deliveryAddress: {
+      street: patientProfile?.address?.street || '',
+      city: patientProfile?.address?.city || '',
+      kebele: patientProfile?.address?.kebele || '',
+      postalCode: patientProfile?.address?.postalCode || ''
+    },
+    notes: ''
+  });
+  
+  // Show the order modal
+  setShowOrderModal(true);
+  
+  // Clear the search
+  setGlobalMedicineSearch('');
+  setGlobalMedicineResults([]);
+};
+
 // Check medicine availability
 const checkMedicineAvailability = async (medicationName, medicationIndex) => {
   if (!medicationName.trim() || !selectedPharmacy) return;
@@ -2187,6 +2224,25 @@ Logout
             <div style={{ fontSize: '14px', color: '#4a5568', fontWeight: '500' }}>
               💊 {result.medicineName}
             </div>
+            {result.quantity > 0 && (
+              <button
+                onClick={() => handleOrderFromSearch(result)}
+                style={{
+                  marginTop: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                🛒 Order from {result.pharmacyName}
+              </button>
+            )}
           </div>
         ))}
       </div>
