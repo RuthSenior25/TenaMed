@@ -6,6 +6,75 @@ const Order = require('../models/Order');
 const Delivery = require('../models/Delivery');
 const Pharmacy = require('../models/Pharmacy');
 
+// Fix existing orders endpoint (temporary)
+router.post('/fix-orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    console.log('Fixing existing orders...');
+    
+    // Find orders that might be stuck in wrong status
+    const stuckOrders = await Order.find({
+      $or: [
+        { status: 'ready', deliveryStatus: { $ne: 'pending' } },
+        { status: 'confirmed', deliveryStatus: 'pending' },
+        { status: 'preparing', deliveryStatus: 'pending' }
+      ]
+    });
+
+    console.log(`Found ${stuckOrders.length} orders to fix`);
+
+    for (const order of stuckOrders) {
+      if (order.status === 'ready') {
+        order.deliveryStatus = 'pending';
+        console.log(`Fixed order ${order._id}: ${order.status} -> ${order.deliveryStatus}`);
+      }
+      await order.save();
+    }
+
+    res.json({
+      success: true,
+      message: `Fixed ${stuckOrders.length} orders`,
+      data: { fixed: stuckOrders.length }
+    });
+  } catch (error) {
+    console.error('Error fixing orders:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Debug endpoint to check all orders (temporary)
+router.get('/debug-orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    console.log('Debug: Fetching ALL orders...');
+    
+    const allOrders = await Order.find({})
+    .populate('pharmacyId', 'pharmacyName email profile')
+    .populate('patientId', 'email profile')
+    .sort({ createdAt: -1 });
+
+    console.log(`Total orders in database: ${allOrders.length}`);
+    
+    const statusCounts = {};
+    allOrders.forEach(order => {
+      const key = `${order.status}/${order.deliveryStatus}`;
+      statusCounts[key] = (statusCounts[key] || 0) + 1;
+    });
+    
+    console.log('Order status combinations:', statusCounts);
+
+    res.json({
+      success: true,
+      data: {
+        total: allOrders.length,
+        statusCounts,
+        orders: allOrders
+      }
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get pending orders for dispatcher
 router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {

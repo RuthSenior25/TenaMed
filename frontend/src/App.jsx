@@ -3859,7 +3859,46 @@ const DispatcherDashboard = () => {
       case 'orders':
         return (
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Pending Orders</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, color: '#1a365d' }}>Pending Orders</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  style={{ ...buttonBaseStyle, background: '#f59e0b', fontSize: '12px', padding: '6px 12px' }}
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/debug-orders`);
+                      const data = await response.json();
+                      console.log('Debug orders:', data);
+                      alert(`Total orders: ${data.data.total}\nStatus counts: ${JSON.stringify(data.data.statusCounts, null, 2)}`);
+                    } catch (error) {
+                      console.error('Debug error:', error);
+                      alert('Debug failed');
+                    }
+                  }}
+                >
+                  Debug Orders
+                </button>
+                <button
+                  style={{ ...buttonBaseStyle, background: '#10b981', fontSize: '12px', padding: '6px 12px' }}
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/fix-orders`, {
+                        method: 'POST'
+                      });
+                      const data = await response.json();
+                      console.log('Fix orders:', data);
+                      alert(data.message);
+                      fetchOrders(); // Refresh orders list
+                    } catch (error) {
+                      console.error('Fix error:', error);
+                      alert('Fix failed');
+                    }
+                  }}
+                >
+                  Fix Orders
+                </button>
+              </div>
+            </div>
             {orders.length === 0 ? (
               <p style={{ color: '#718096' }}>No pending orders</p>
             ) : (
