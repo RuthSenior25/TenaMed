@@ -930,9 +930,20 @@ const searchGlobalMedicines = async (medicineName) => {
       }
     };
     
-    // Check if medicine exists in our inventory data
-    const medicineData = pharmacyInventoryData[medicineName];
-    if (medicineData) {
+    // Check if medicine exists in our inventory data (support partial matching)
+    let medicineData = null;
+    let matchedMedicineName = null;
+    
+    // Search for partial matches in our inventory data
+    for (const [fullMedicineName, data] of Object.entries(pharmacyInventoryData)) {
+      if (fullMedicineName.toLowerCase().includes(searchTerm)) {
+        medicineData = data;
+        matchedMedicineName = fullMedicineName;
+        break;
+      }
+    }
+    
+    if (medicineData && matchedMedicineName) {
       // Create results for each pharmacy that has this medicine
       approvedPharmacies.forEach(pharmacy => {
         const pharmacyName = pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`;
@@ -958,7 +969,7 @@ const searchGlobalMedicines = async (medicineName) => {
             pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
             pharmacyCity: pharmacy.pharmacyLocation?.city || '',
             distance: distance,
-            medicineName: medicineName,
+            medicineName: matchedMedicineName,
             price: pharmacyData.price,
             quantity: pharmacyData.quantity,
             availability: pharmacyData.quantity > 0 ? 'in_stock' : 'out_of_stock',
