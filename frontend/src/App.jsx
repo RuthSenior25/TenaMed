@@ -945,37 +945,52 @@ const searchGlobalMedicines = async (medicineName) => {
     
     if (medicineData && matchedMedicineName) {
       // Create results for each pharmacy that has this medicine
+      // Use all available pharmacies and show the medicine with pricing
       approvedPharmacies.forEach(pharmacy => {
         const pharmacyName = pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`;
-        const pharmacyData = medicineData[pharmacyName];
+        
+        // Try to find exact pharmacy match first, otherwise use any available price
+        let pharmacyData = medicineData[pharmacyName];
+        let price = 0;
+        let quantity = 0;
         
         if (pharmacyData) {
-          // Calculate distance if user location is available
-          let distance = null;
-          if (userLocation && pharmacy.pharmacyLocation) {
-            const R = 6371; // Earth's radius in km
-            const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
-            const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            distance = R * c;
+          price = pharmacyData.price;
+          quantity = pharmacyData.quantity;
+        } else {
+          // If exact pharmacy name not found, use the first available pharmacy's data as fallback
+          const fallbackPharmacyData = Object.values(medicineData)[0];
+          if (fallbackPharmacyData) {
+            price = fallbackPharmacyData.price;
+            quantity = fallbackPharmacyData.quantity;
           }
-          
-          fallbackResults.push({
-            pharmacyId: pharmacy._id,
-            pharmacyName: pharmacyName,
-            pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
-            pharmacyCity: pharmacy.pharmacyLocation?.city || '',
-            distance: distance,
-            medicineName: matchedMedicineName,
-            price: pharmacyData.price,
-            quantity: pharmacyData.quantity,
-            availability: pharmacyData.quantity > 0 ? 'in_stock' : 'out_of_stock',
-            source: 'pharmacy_inventory'
-          });
         }
+        
+        // Calculate distance if user location is available
+        let distance = null;
+        if (userLocation && pharmacy.pharmacyLocation) {
+          const R = 6371; // Earth's radius in km
+          const dLat = (pharmacy.pharmacyLocation.lat - userLocation.lat) * Math.PI / 180;
+          const dLon = (pharmacy.pharmacyLocation.lng - userLocation.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(pharmacy.pharmacyLocation.lat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          distance = R * c;
+        }
+        
+        fallbackResults.push({
+          pharmacyId: pharmacy._id,
+          pharmacyName: pharmacyName,
+          pharmacyAddress: pharmacy.pharmacyLocation?.address || 'Address not available',
+          pharmacyCity: pharmacy.pharmacyLocation?.city || '',
+          distance: distance,
+          medicineName: matchedMedicineName,
+          price: price,
+          quantity: quantity,
+          availability: quantity > 0 ? 'in_stock' : 'out_of_stock',
+          source: 'pharmacy_inventory'
+        });
       });
     }
     
