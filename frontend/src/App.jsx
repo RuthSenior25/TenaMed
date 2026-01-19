@@ -3839,6 +3839,14 @@ const DispatcherDashboard = () => {
     fetchDrivers();
     fetchDeliveries();
     fetchAnalytics();
+    
+    // Set up polling for new orders every 10 seconds
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchDrivers();
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {

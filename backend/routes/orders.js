@@ -116,8 +116,17 @@ router.put('/:orderId/status', auth.authenticate, async (req, res) => {
     }
 
     order.status = status;
+    
+    // Auto-set delivery status when order becomes ready for pickup
+    if (status === 'ready' && order.deliveryStatus === 'pending') {
+      order.deliveryStatus = 'pending'; // Ensure it's ready for dispatcher
+      console.log(`Order ${order._id} marked as ready for pickup by pharmacy ${req.user._id}`);
+    }
+    
     order.updatedAt = new Date();
     await order.save();
+    
+    console.log(`Order ${order._id} status updated to: ${status} / ${order.deliveryStatus}`);
 
     await order.populate('pharmacyId', 'pharmacyName email profile');
     await order.populate('patientId', 'email profile');

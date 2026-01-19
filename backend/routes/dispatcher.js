@@ -9,6 +9,8 @@ const Pharmacy = require('../models/Pharmacy');
 // Get pending orders for dispatcher
 router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
+    console.log('Fetching orders for dispatcher...');
+    
     const orders = await Order.find({ 
       status: 'ready',
       deliveryStatus: 'pending'
@@ -16,6 +18,11 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
     .populate('pharmacyId', 'pharmacyName email profile')
     .populate('patientId', 'email profile')
     .sort({ createdAt: -1 });
+
+    console.log(`Found ${orders.length} ready orders for dispatcher`);
+    orders.forEach(order => {
+      console.log(`Order ${order._id}: ${order.status} / ${order.deliveryStatus} - ${order.pharmacyId?.pharmacyName}`);
+    });
 
     res.json({
       success: true,
