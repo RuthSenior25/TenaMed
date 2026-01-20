@@ -87,8 +87,13 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => {
+.then(async () => {
   console.log('✅ MongoDB connected successfully');
+  
+  // Seed hardcoded dispatcher
+  const seedDispatcher = require('./seedDispatcher');
+  await seedDispatcher();
+  
   console.log('🚀 Server starting...');
 })
 .catch((err) => {
