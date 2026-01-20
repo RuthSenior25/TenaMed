@@ -3984,6 +3984,7 @@ const DriverDashboard = () => {
 const DispatcherDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [activePanel, setActivePanel] = useState('orders');
   const [orders, setOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
