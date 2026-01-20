@@ -345,7 +345,7 @@ const Register = () => {
                 <option value="">Select your role</option>
                 <option value="patient">Patient - Order and manage prescriptions</option>
                 <option value="pharmacy">Pharmacy Owner - Manage pharmacy inventory and orders</option>
-                <option value="dispatcher">Delivery Person - Handle medication deliveries</option>
+                <option value="delivery_person">Delivery Person - Handle medication deliveries</option>
               </select>
               {errors.role && (
                 <p className="text-red-500 text-xs mt-1">{errors.role.message}</p>
