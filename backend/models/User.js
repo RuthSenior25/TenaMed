@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema({
   isApproved: {
     type: Boolean,
     default: function() {
-      return this.role === 'patient' || this.role === 'admin';
+      return this.role === 'patient' || this.role === 'admin' || this.role === 'driver';
     }
   },
   lastLogin: { type: Date },

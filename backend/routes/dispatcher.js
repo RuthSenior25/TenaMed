@@ -6,56 +6,87 @@ const Order = require('../models/Order');
 const Delivery = require('../models/Delivery');
 const Pharmacy = require('../models/Pharmacy');
 
-// Create test dispatcher user (temporary - remove in production)
-router.post('/create-test-dispatcher', async (req, res) => {
+// Get pending delivery persons for approval
+router.get('/pending-drivers', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
-    console.log('Creating test dispatcher user...');
+    console.log('Fetching pending delivery persons for approval...');
     
-    const User = require('../models/User');
-    const bcrypt = require('bcryptjs');
-    
-    // Check if dispatcher already exists
-    const existingDispatcher = await User.findOne({ email: 'dispatcher@tenamed.com' });
-    if (existingDispatcher) {
-      return res.json({
-        success: true,
-        message: 'Test dispatcher already exists',
-        user: { email: existingDispatcher.email, role: existingDispatcher.role }
-      });
-    }
-    
-    // Create test dispatcher
-    const hashedPassword = await bcrypt.hash('dispatcher123', 10);
-    const dispatcher = new User({
-      username: 'dispatcher',
-      email: 'dispatcher@tenamed.com',
-      password: hashedPassword,
-      role: 'dispatcher',
-      profile: {
-        firstName: 'Test',
-        lastName: 'Dispatcher'
-      },
-      isActive: true,
-      isApproved: true
-    });
-    
-    await dispatcher.save();
-    
-    console.log('✅ Test dispatcher created successfully');
-    
+    const pendingDrivers = await User.find({ 
+      role: 'driver',
+      isApproved: false 
+    }).select('email profile firstName lastName createdAt vehicleType licensePlate');
+
+    console.log(`Found ${pendingDrivers.length} pending delivery persons`);
+
     res.json({
       success: true,
-      message: 'Test dispatcher created successfully',
-      credentials: {
-        email: 'dispatcher@tenamed.com',
-        password: 'dispatcher123'
-      }
+      data: pendingDrivers
     });
   } catch (error) {
-    console.error('Error creating test dispatcher:', error);
+    console.error('Error fetching pending drivers:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
+// Approve delivery person
+router.put('/approve-driver/:driverId', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    
+    console.log(`Approving driver ${driverId}`);
+
+    const driver = await User.findByIdAndUpdate(
+      driverId,
+      { 
+        isApproved: true,
+        status: 'approved'
+      },
+      { new: true }
+    ).select('email profile firstName lastName');
+
+    console.log(`✅ Driver ${driver.email} approved successfully`);
+
+    res.json({
+      success: true,
+      message: 'Driver approved successfully',
+      data: driver
+    });
+  } catch (error) {
+    console.error('Error approving driver:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Reject delivery person
+router.put('/reject-driver/:driverId', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { rejectionReason } = req.body;
+    
+    console.log(`Rejecting driver ${driverId}, reason: ${rejectionReason}`);
+
+    const driver = await User.findByIdAndUpdate(
+      driverId,
+      { 
+        status: 'rejected',
+        rejectionReason: rejectionReason
+      },
+      { new: true }
+    ).select('email profile firstName lastName');
+
+    console.log(`❌ Driver ${driver.email} rejected: ${rejectionReason}`);
+
+    res.json({
+      success: true,
+      message: 'Driver rejected successfully',
+      data: driver
+    });
+  } catch (error) {
+    console.error('Error rejecting driver:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 
 // Test dispatcher authentication
 router.get('/test-auth', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {

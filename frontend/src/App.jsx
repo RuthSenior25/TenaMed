@@ -3718,6 +3718,10 @@ const DriverDashboard = () => {
       const data = await response.json();
       if (data.success) {
         setDriverProfile(data.data);
+        // Check if driver is approved, if not, redirect to pending approval message
+        if (!data.data.isApproved) {
+          alert('Your driver account is pending approval. Please wait for dispatcher approval.');
+        }
       }
     } catch (error) {
       console.error('Error fetching driver profile:', error);
@@ -3980,10 +3984,10 @@ const DriverDashboard = () => {
 const DispatcherDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const [activePanel, setActivePanel] = useState('orders');
   const [orders, setOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
+  const [pendingDrivers, setPendingDrivers] = useState([]);
   const [analytics, setAnalytics] = useState({
     todayDeliveries: 0,
     weekDeliveries: 0,
@@ -3995,6 +3999,71 @@ const DispatcherDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
+
+  // Fetch pending drivers
+  const fetchPendingDrivers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/pending-drivers`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPendingDrivers(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pending drivers:', error);
+    }
+  };
+
+  // Approve driver
+  const approveDriver = async (driverId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/approve-driver/${driverId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchPendingDrivers(); // Refresh the list
+        fetchDrivers(); // Refresh available drivers
+        alert('Driver approved successfully!');
+      }
+    } catch (error) {
+      console.error('Error approving driver:', error);
+      alert('Failed to approve driver');
+    }
+  };
+
+  // Reject driver
+  const rejectDriver = async (driverId, rejectionReason) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/reject-driver/${driverId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rejectionReason })
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchPendingDrivers(); // Refresh the list
+        alert('Driver rejected successfully!');
+      }
+    } catch (error) {
+      console.error('Error rejecting driver:', error);
+      alert('Failed to reject driver');
+    }
+  };
 
   // Fetch pending orders
   const fetchOrders = async () => {
@@ -4125,7 +4194,7 @@ const DispatcherDashboard = () => {
     fetchDrivers();
     fetchDeliveries();
     fetchAnalytics();
-    
+    fetchPendingDrivers(); // Fetch pending drivers for approval
     // Set up polling for new orders every 10 seconds
     const interval = setInterval(() => {
       fetchOrders();
@@ -4281,6 +4350,118 @@ const DispatcherDashboard = () => {
                         <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
                           {driver.email}
                         </p>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          Vehicle: {driver.vehicleType}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: driver.isAvailable ? '#d1fae5' : '#fee2e2',
+                          color: driver.isAvailable ? '#065f46' : '#991b1b'
+                        }}>
+                          {driver.isAvailable ? 'Available' : 'Busy'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'pending-drivers':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Pending Driver Approvals</h3>
+            {pendingDrivers.length === 0 ? (
+              <p style={{ color: '#718096' }}>No pending driver approvals</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {pendingDrivers.map((driver) => (
+                  <div key={driver._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          {driver.profile?.firstName} {driver.profile?.lastName}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          {driver.email}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Vehicle: {driver.vehicleType}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Applied: {new Date(driver.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          style={{ 
+                            padding: '6px 12px',
+                            backgroundColor: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => approveDriver(driver._id)}
+                        >
+                          ✅ Approve
+                        </button>
+                        <button
+                          style={{ 
+                            padding: '6px 12px',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            const reason = prompt('Please enter rejection reason:');
+                            if (reason) {
+                              rejectDriver(driver._id, reason);
+                            }
+                          }}
+                        >
+                          ❌ Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'active-deliveries':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Active Deliveries</h3>
+            {drivers.length === 0 ? (
+              <p style={{ color: '#718096' }}>No available drivers</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {drivers.map((driver) => (
+                  <div key={driver._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          {driver.profile?.firstName} {driver.profile?.lastName}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          {driver.email}
+                        </p>
                         <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
                           Vehicle: {driver.vehicleType}
                         </p>
@@ -4403,27 +4584,15 @@ const DispatcherDashboard = () => {
           <div style={cardBaseStyle}>
             <h3 style={cardTitleStyle}>Pending Orders</h3>
             <p style={cardBodyStyle}>View and assign drivers to pending orders</p>
-            <button style={actionButtonStyle(activePanel === 'orders', '#4299e1')} onClick={() => setActivePanel('orders')}>
-              View Orders ({orders.length})
-            </button>
-          </div>
-          <div style={cardBaseStyle}>
-            <h3 style={cardTitleStyle}>Available Drivers</h3>
-            <p style={cardBodyStyle}>Manage driver availability and assignments</p>
-            <button style={actionButtonStyle(activePanel === 'drivers', '#48bb78')} onClick={() => setActivePanel('drivers')}>
-              View Drivers ({drivers.length})
-            </button>
-          </div>
-          <div style={cardBaseStyle}>
-            <h3 style={cardTitleStyle}>Active Deliveries</h3>
-            <p style={cardBodyStyle}>Track ongoing deliveries and update status</p>
-            <button style={actionButtonStyle(activePanel === 'deliveries', '#dd6b20')} onClick={() => setActivePanel('deliveries')}>
-              View Deliveries ({deliveries.length})
-            </button>
-          </div>
-        </div>
 
-        {/* Workspace */}
+{/* Workspace */}
+<div style={workspaceCardStyle}>
+  <div>
+    <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
+    <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}</p>
+  </div>
+  {renderPanelContent()}
+</div>
         <div style={workspaceCardStyle}>
           <div>
             <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
