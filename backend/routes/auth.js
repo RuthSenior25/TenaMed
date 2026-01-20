@@ -568,4 +568,34 @@ router.get('/approved-pharmacies', async (req, res) => {
   }
 });
 
+// Update driver availability
+router.put('/update-availability', authenticate, auth.checkRole(['driver']), async (req, res) => {
+  try {
+    const { isAvailable } = req.body;
+    
+    console.log(`Driver ${req.user._id} updating availability to: ${isAvailable}`);
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { isAvailable },
+      { new: true }
+    );
+
+    console.log(`✅ Driver availability updated: ${isAvailable}`);
+
+    res.json({
+      success: true,
+      message: 'Availability updated successfully',
+      data: { isAvailable: user.isAvailable }
+    });
+  } catch (error) {
+    console.error('Error updating availability:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update availability', 
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;

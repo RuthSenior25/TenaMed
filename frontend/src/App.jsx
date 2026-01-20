@@ -3696,6 +3696,287 @@ onChange={(e) => setApplication((prev) => ({ ...prev, phone: e.target.value }))}
 );
 };
 
+// Driver Dashboard Component
+const DriverDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [activePanel, setActivePanel] = useState('deliveries');
+  const [deliveries, setDeliveries] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [driverProfile, setDriverProfile] = useState(null);
+
+  // Fetch driver profile
+  const fetchDriverProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/me`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDriverProfile(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching driver profile:', error);
+    }
+  };
+
+  // Fetch driver deliveries
+  const fetchDeliveries = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-deliveries`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDeliveries(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching deliveries:', error);
+    }
+  };
+
+  // Update availability
+  const updateAvailability = async (isAvailable) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/update-availability`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ isAvailable })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDriverProfile(prev => ({ ...prev, isAvailable }));
+        alert(`Availability updated: ${isAvailable ? 'Available' : 'Unavailable'}`);
+      }
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      alert('Failed to update availability');
+    }
+  };
+
+  // Update delivery status
+  const updateDeliveryStatus = async (deliveryId, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/update-delivery/${deliveryId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchDeliveries(); // Refresh deliveries
+        alert('Delivery status updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating delivery status:', error);
+      alert('Failed to update delivery status');
+    }
+  };
+
+  useEffect(() => {
+    fetchDriverProfile();
+    fetchDeliveries();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const renderPanelContent = () => {
+    switch (activePanel) {
+      case 'deliveries':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>My Deliveries</h3>
+            {deliveries.length === 0 ? (
+              <p style={{ color: '#718096' }}>No deliveries assigned</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {deliveries.map((delivery) => (
+                  <div key={delivery._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                          Order #{delivery.orderId?._id?.slice(-8) || 'N/A'}
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                          {delivery.orderId?.medications?.map(med => med.name).join(', ') || 'Medications'}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Customer: {delivery.orderId?.deliveryAddress?.street}, {delivery.orderId?.deliveryAddress?.city}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Total: ${delivery.orderId?.totalAmount || 0}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: delivery.status === 'delivered' ? '#059669' : 
+                                 delivery.status === 'in_transit' ? '#f59e0b' :
+                                 delivery.status === 'picked_up' ? '#3b82f6' : '#6b7280',
+                          fontWeight: '600',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: delivery.status === 'delivered' ? '#d1fae5' :
+                                          delivery.status === 'in_transit' ? '#fef3c7' :
+                                          delivery.status === 'picked_up' ? '#dbeafe' : '#f3f4f1',
+                        }}>
+                          {delivery.status === 'assigned' ? 'Assigned' :
+                           delivery.status === 'picked_up' ? 'Picked Up' :
+                           delivery.status === 'in_transit' ? 'In Transit' :
+                           delivery.status === 'delivered' ? 'Delivered' : delivery.status}
+                        </div>
+                        {delivery.status !== 'delivered' && (
+                          <button
+                            style={{ 
+                              marginTop: '8px',
+                              padding: '6px 12px',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              width: '100%'
+                            }}
+                            onClick={() => updateDeliveryStatus(delivery._id, 
+                              delivery.status === 'assigned' ? 'picked_up' :
+                              delivery.status === 'picked_up' ? 'in_transit' : 'delivered'
+                            )}
+                          >
+                            {delivery.status === 'assigned' ? 'Mark Picked Up' :
+                             delivery.status === 'picked_up' ? 'Mark In Transit' : 'Mark Delivered'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'profile':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>My Profile</h3>
+            {driverProfile ? (
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 8px', color: '#2d3748' }}>Contact Information</h4>
+                  <p><strong>Name:</strong> {driverProfile.profile?.firstName} {driverProfile.profile?.lastName}</p>
+                  <p><strong>Email:</strong> {driverProfile.email}</p>
+                  <p><strong>Phone:</strong> {driverProfile.profile?.phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 8px', color: '#2d3748' }}>Vehicle Information</h4>
+                  <p><strong>Vehicle Type:</strong> {driverProfile.vehicleType || 'Not specified'}</p>
+                  <p><strong>License Plate:</strong> {driverProfile.licensePlate || 'Not specified'}</p>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 8px', color: '#2d3748' }}>Delivery Statistics</h4>
+                  <p><strong>Total Deliveries:</strong> {driverProfile.deliveryStats?.totalDeliveries || 0}</p>
+                  <p><strong>Successful Deliveries:</strong> {driverProfile.deliveryStats?.successfulDeliveries || 0}</p>
+                  <p><strong>Average Delivery Time:</strong> {driverProfile.deliveryStats?.averageDeliveryTime || 0} minutes</p>
+                  <p><strong>Rating:</strong> {driverProfile.deliveryStats?.rating || 5.0}/5.0</p>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 8px', color: '#2d3748' }}>Availability Status</h4>
+                  <button
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: driverProfile.isAvailable ? '#10b981' : '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      width: '100%'
+                    }}
+                    onClick={() => updateAvailability(!driverProfile.isAvailable)}
+                  >
+                    {driverProfile.isAvailable ? '🟢 Available for Deliveries' : '🔴 Currently Unavailable'}
+                  </button>
+                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#718096' }}>
+                    {driverProfile.isAvailable 
+                      ? 'You are available and will receive new delivery assignments' 
+                      : 'You are unavailable and will not receive new assignments'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: '#718096' }}>Loading profile...</p>
+            )}
+          </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={dashboardShellStyle}>
+      <div style={dashboardContentStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>
+              Driver Dashboard
+            </h1>
+            <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>
+              Manage your deliveries and availability
+            </p>
+          </div>
+          <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Deliveries</h3>
+            <p style={cardBodyStyle}>View and manage your assigned deliveries.</p>
+            <button style={actionButtonStyle(activePanel === 'deliveries', '#059669')} onClick={() => setActivePanel('deliveries')}>
+              My Deliveries {deliveries.length > 0 && `(${deliveries.length})`}
+            </button>
+          </div>
+
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Profile</h3>
+            <p style={cardBodyStyle}>Manage your profile and availability status.</p>
+            <button style={actionButtonStyle(activePanel === 'profile', '#3b82f6')} onClick={() => setActivePanel('profile')}>
+              My Profile
+            </button>
+          </div>
+        </div>
+
+        {renderPanelContent()}
+      </div>
+    </div>
+  );
+};
+
 const DispatcherDashboard = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -4742,9 +5023,9 @@ switch (user.role) {
 case 'patient':
 return <PatientDashboard />;
 case 'dispatcher':
-return <DispatcherDashboard />;
+  return <DispatcherDashboard />;
 case 'delivery_person':
-return <DeliveryDashboard />;
+  return <DriverDashboard />;
 case 'government':
 return (
 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">

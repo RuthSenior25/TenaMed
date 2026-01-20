@@ -158,4 +158,95 @@ router.put('/:orderId/status', auth.authenticate, async (req, res) => {
   }
 });
 
+// Get driver deliveries
+router.get('/my-deliveries', auth.authenticate, auth.checkRole(['driver']), async (req, res) => {
+  try {
+    console.log(`Fetching deliveries for driver: ${req.user._id}`);
+    
+    const deliveries = await Delivery.find({ driverId: req.user._id })
+      .populate('orderId', 'medications totalAmount deliveryAddress')
+      .populate('pharmacyId', 'pharmacyName profile')
+      .sort({ assignedAt: -1 });
+
+    console.log(`Found ${deliveries.length} deliveries for driver`);
+
+    res.json({
+      success: true,
+      data: deliveries
+    });
+  } catch (error) {
+    console.error('Error fetching driver deliveries:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch deliveries', 
+      error: error.message 
+    });
+  }
+});
+
+// Update delivery status (for drivers)
+router.put('/update-delivery/:deliveryId', auth.authenticate, auth.checkRole(['driver']), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { deliveryId } = req.params;
+
+    console.log(`Driver ${req.user._id} updating delivery ${deliveryId} to status: ${status}`);
+
+    const delivery = await Delivery.findById(deliveryId);
+    if (!delivery) {
+      return res.status(404).json({ success: false, message: 'Delivery not found' });
+    }
+
+    // Check if driver owns this delivery
+    if (delivery.driverId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Validate status transition
+    const validTransitions = {
+      'assigned': ['picked_up'],
+      'picked_up': ['in_transit'],
+      'in_transit': ['delivered']
+    };
+
+    if (!validTransitions[delivery.status]?.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid status transition from ${delivery.status} to ${status}` 
+      });
+    }
+
+    delivery.status = status;
+    delivery.updatedAt = new Date();
+    await delivery.save();
+
+    // Update order delivery status
+    if (delivery.orderId) {
+      await Order.findByIdAndUpdate(delivery.orderId, {
+        deliveryStatus: status
+      });
+    }
+
+    // If delivery is complete, make driver available again
+    if (status === 'delivered') {
+      await User.findByIdAndUpdate(req.user._id, { isAvailable: true });
+    }
+
+    console.log(`✅ Delivery ${deliveryId} updated to: ${status}`);
+
+    res.json({
+      success: true,
+      message: 'Delivery status updated',
+      data: delivery
+    });
+  } catch (error) {
+    console.error('Error updating delivery status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update delivery status', 
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;
