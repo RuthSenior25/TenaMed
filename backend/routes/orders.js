@@ -100,33 +100,45 @@ router.put('/:orderId/status', auth.authenticate, async (req, res) => {
   try {
     const { status } = req.body;
     const { orderId } = req.params;
+    
+    console.log(`=== ORDER STATUS UPDATE ===`);
+    console.log(`Order ID: ${orderId}`);
+    console.log(`Requested status: ${status}`);
+    console.log(`User role: ${req.user.role}`);
+    console.log(`User ID: ${req.user._id}`);
 
     const order = await Order.findById(orderId);
     if (!order) {
+      console.log(`Order not found: ${orderId}`);
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    console.log(`Current order status: ${order.status} / ${order.deliveryStatus}`);
+
     // Check permissions
     if (req.user.role === 'pharmacy' && order.pharmacyId.toString() !== req.user._id.toString()) {
+      console.log(`Pharmacy not authorized for this order`);
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
     if (req.user.role === 'patient' && order.patientId.toString() !== req.user._id.toString()) {
+      console.log(`Patient not authorized for this order`);
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
     order.status = status;
     
     // Auto-set delivery status when order becomes ready for pickup
-    if (status === 'ready' && order.deliveryStatus === 'pending') {
+    if (status === 'ready') {
       order.deliveryStatus = 'pending'; // Ensure it's ready for dispatcher
-      console.log(`Order ${order._id} marked as ready for pickup by pharmacy ${req.user._id}`);
+      console.log(`🚨 ORDER READY FOR DISPATCHER! Order ${order._id} marked as ready for pickup by pharmacy ${req.user._id}`);
     }
     
     order.updatedAt = new Date();
     await order.save();
     
-    console.log(`Order ${order._id} status updated to: ${status} / ${order.deliveryStatus}`);
+    console.log(`✅ Order ${order._id} status updated to: ${order.status} / ${order.deliveryStatus}`);
+    console.log(`=== END ORDER STATUS UPDATE ===`);
 
     await order.populate('pharmacyId', 'pharmacyName email profile');
     await order.populate('patientId', 'email profile');

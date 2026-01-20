@@ -78,7 +78,7 @@ router.get('/debug-orders', auth.authenticate, auth.checkRole(['dispatcher']), a
 // Get pending orders for dispatcher
 router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
-    console.log('Fetching orders for dispatcher...');
+    console.log('=== DISPATCHER FETCHING ORDERS ===');
     
     const orders = await Order.find({ 
       status: 'ready',
@@ -88,10 +88,20 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
     .populate('patientId', 'email profile')
     .sort({ createdAt: -1 });
 
-    console.log(`Found ${orders.length} ready orders for dispatcher`);
+    console.log(`🔍 Dispatcher found ${orders.length} ready orders`);
     orders.forEach(order => {
-      console.log(`Order ${order._id}: ${order.status} / ${order.deliveryStatus} - ${order.pharmacyId?.pharmacyName}`);
+      console.log(`📦 Order ${order._id.slice(-8)}: ${order.status} / ${order.deliveryStatus} - ${order.pharmacyId?.pharmacyName}`);
     });
+    
+    // Also check what other orders exist
+    const allOrders = await Order.find({}).select('status deliveryStatus pharmacyId');
+    const statusBreakdown = {};
+    allOrders.forEach(order => {
+      const key = `${order.status}/${order.deliveryStatus}`;
+      statusBreakdown[key] = (statusBreakdown[key] || 0) + 1;
+    });
+    console.log(`📊 All orders status breakdown:`, statusBreakdown);
+    console.log('=== END DISPATCHER FETCH ===');
 
     res.json({
       success: true,

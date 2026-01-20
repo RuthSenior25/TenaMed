@@ -3011,6 +3011,8 @@ useEffect(() => {
 // Update order status
 const updateOrderStatus = async (orderId, newStatus) => {
   try {
+    console.log(`🔄 Pharmacy updating order ${orderId} to status: ${newStatus}`);
+    
     const token = localStorage.getItem('token');
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/${orderId}/status`, {
       method: 'PUT',
@@ -3022,15 +3024,18 @@ const updateOrderStatus = async (orderId, newStatus) => {
     });
     
     const data = await response.json();
+    console.log(`📥 Response from order status update:`, data);
+    
     if (data.success) {
       // Refresh orders list
       fetchPharmacyOrders();
       alert('Order status updated successfully!');
     } else {
+      console.error('❌ Order status update failed:', data);
       alert('Failed to update order status: ' + (data.message || 'Unknown error'));
     }
   } catch (error) {
-    console.error('Error updating order status:', error);
+    console.error('❌ Error updating order status:', error);
     alert('Failed to update order status. Please try again.');
   }
 };
