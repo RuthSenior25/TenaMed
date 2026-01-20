@@ -3868,6 +3868,44 @@ const DispatcherDashboard = () => {
               <h3 style={{ margin: 0, color: '#1a365d' }}>Pending Orders</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
+                  style={{ ...buttonBaseStyle, background: '#dc2626', fontSize: '12px', padding: '6px 12px' }}
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/create-test-dispatcher`, {
+                        method: 'POST'
+                      });
+                      const data = await response.json();
+                      console.log('Create dispatcher result:', data);
+                      if (data.success) {
+                        alert(`Test dispatcher created!\nEmail: ${data.credentials.email}\nPassword: ${data.credentials.password}\n\nUse these to login as dispatcher.`);
+                      } else {
+                        alert('Failed to create test dispatcher');
+                      }
+                    } catch (error) {
+                      console.error('Create dispatcher error:', error);
+                      alert('Create dispatcher failed');
+                    }
+                  }}
+                >
+                  Create Dispatcher
+                </button>
+                <button
+                  style={{ ...buttonBaseStyle, background: '#6366f1', fontSize: '12px', padding: '6px 12px' }}
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/test-auth`);
+                      const data = await response.json();
+                      console.log('Auth test result:', data);
+                      alert(`Auth test: ${data.success ? 'SUCCESS' : 'FAILED'}\n${JSON.stringify(data.user || data.message, null, 2)}`);
+                    } catch (error) {
+                      console.error('Auth test error:', error);
+                      alert('Auth test failed');
+                    }
+                  }}
+                >
+                  Test Auth
+                </button>
+                <button
                   style={{ ...buttonBaseStyle, background: '#f59e0b', fontSize: '12px', padding: '6px 12px' }}
                   onClick={async () => {
                     try {

@@ -6,6 +6,77 @@ const Order = require('../models/Order');
 const Delivery = require('../models/Delivery');
 const Pharmacy = require('../models/Pharmacy');
 
+// Create test dispatcher user (temporary - remove in production)
+router.post('/create-test-dispatcher', async (req, res) => {
+  try {
+    console.log('Creating test dispatcher user...');
+    
+    const User = require('../models/User');
+    const bcrypt = require('bcryptjs');
+    
+    // Check if dispatcher already exists
+    const existingDispatcher = await User.findOne({ email: 'dispatcher@tenamed.com' });
+    if (existingDispatcher) {
+      return res.json({
+        success: true,
+        message: 'Test dispatcher already exists',
+        user: { email: existingDispatcher.email, role: existingDispatcher.role }
+      });
+    }
+    
+    // Create test dispatcher
+    const hashedPassword = await bcrypt.hash('dispatcher123', 10);
+    const dispatcher = new User({
+      username: 'dispatcher',
+      email: 'dispatcher@tenamed.com',
+      password: hashedPassword,
+      role: 'dispatcher',
+      profile: {
+        firstName: 'Test',
+        lastName: 'Dispatcher'
+      },
+      isActive: true,
+      isApproved: true
+    });
+    
+    await dispatcher.save();
+    
+    console.log('✅ Test dispatcher created successfully');
+    
+    res.json({
+      success: true,
+      message: 'Test dispatcher created successfully',
+      credentials: {
+        email: 'dispatcher@tenamed.com',
+        password: 'dispatcher123'
+      }
+    });
+  } catch (error) {
+    console.error('Error creating test dispatcher:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Test dispatcher authentication
+router.get('/test-auth', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    console.log('🧪 Dispatcher auth test - User:', req.user);
+    res.json({
+      success: true,
+      message: 'Dispatcher authentication successful',
+      user: {
+        id: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        isActive: req.user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Dispatcher auth test error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Fix existing orders endpoint (temporary)
 router.post('/fix-orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
