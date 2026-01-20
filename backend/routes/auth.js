@@ -598,4 +598,61 @@ router.put('/update-availability', authenticate, auth.checkRole(['driver']), asy
   }
 });
 
+// Manual dispatcher creation endpoint (temporary)
+router.post('/create-dispatcher', async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const User = require('../models/User');
+    
+    const dispatcherCredentials = {
+      email: 'dispatcher@tenamed.com',
+      password: 'TenaMed1',
+      username: 'dispatcher',
+      role: 'dispatcher',
+      profile: {
+        firstName: 'Main',
+        lastName: 'Dispatcher'
+      },
+      isActive: true,
+      isApproved: true
+    };
+    
+    // Check if dispatcher already exists
+    const existingDispatcher = await User.findOne({ email: dispatcherCredentials.email });
+    if (existingDispatcher) {
+      return res.json({
+        success: true,
+        message: 'Dispatcher already exists',
+        credentials: {
+          email: dispatcherCredentials.email,
+          password: dispatcherCredentials.password
+        }
+      });
+    }
+    
+    // Create dispatcher
+    const hashedPassword = await bcrypt.hash(dispatcherCredentials.password, 10);
+    const dispatcher = new User({
+      ...dispatcherCredentials,
+      password: hashedPassword
+    });
+    
+    await dispatcher.save();
+    
+    console.log('✅ Hardcoded dispatcher created manually!');
+    
+    res.json({
+      success: true,
+      message: 'Dispatcher created successfully',
+      credentials: {
+        email: dispatcherCredentials.email,
+        password: dispatcherCredentials.password
+      }
+    });
+  } catch (error) {
+    console.error('Error creating dispatcher:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
