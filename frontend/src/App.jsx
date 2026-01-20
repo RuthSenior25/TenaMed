@@ -4221,19 +4221,19 @@ const DispatcherDashboard = () => {
                   style={{ ...buttonBaseStyle, background: '#dc2626', fontSize: '12px', padding: '6px 12px' }}
                   onClick={async () => {
                     try {
-                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/create-test-dispatcher`, {
+                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/create-hardcoded-dispatcher`, {
                         method: 'POST'
                       });
                       const data = await response.json();
-                      console.log('Create dispatcher result:', data);
+                      console.log('Create hardcoded dispatcher result:', data);
                       if (data.success) {
-                        alert(`Test dispatcher created!\nEmail: ${data.credentials.email}\nPassword: ${data.credentials.password}\n\nUse these to login as dispatcher.`);
+                        alert(`Hardcoded dispatcher created!\nEmail: ${data.credentials.email}\nPassword: ${data.credentials.password}\n\nUse these to login as dispatcher.`);
                       } else {
-                        alert('Failed to create test dispatcher');
+                        alert('Failed to create hardcoded dispatcher');
                       }
                     } catch (error) {
-                      console.error('Create dispatcher error:', error);
-                      alert('Create dispatcher failed');
+                      console.error('Create hardcoded dispatcher error:', error);
+                      alert('Create hardcoded dispatcher failed');
                     }
                   }}
                 >
@@ -4584,15 +4584,37 @@ const DispatcherDashboard = () => {
           <div style={cardBaseStyle}>
             <h3 style={cardTitleStyle}>Pending Orders</h3>
             <p style={cardBodyStyle}>View and assign drivers to pending orders</p>
+            <button style={actionButtonStyle(activePanel === 'orders', '#3b82f6')} onClick={() => setActivePanel('orders')}>
+              Pending Orders {orders.length > 0 && `(${orders.length})`}
+            </button>
+          </div>
 
-{/* Workspace */}
-<div style={workspaceCardStyle}>
-  <div>
-    <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
-    <p style={{ margin: 0, color: '#718096' }}>Hands-on tools for {activePanel}</p>
-  </div>
-  {renderPanelContent()}
-</div>
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Pending Drivers</h3>
+            <p style={cardBodyStyle}>Review and approve delivery person applications.</p>
+            <button style={actionButtonStyle(activePanel === 'pending-drivers', '#f59e0b')} onClick={() => setActivePanel('pending-drivers')}>
+              Pending Approvals {pendingDrivers.length > 0 && `(${pendingDrivers.length})`}
+            </button>
+          </div>
+
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Available Drivers</h3>
+            <p style={cardBodyStyle}>View available drivers for assignments.</p>
+            <button style={actionButtonStyle(activePanel === 'drivers', '#3b82f6')} onClick={() => setActivePanel('drivers')}>
+              Available Drivers {drivers.length > 0 && `(${drivers.length})`}
+            </button>
+          </div>
+
+          <div style={cardBaseStyle}>
+            <h3 style={cardTitleStyle}>Active Deliveries</h3>
+            <p style={cardBodyStyle}>Track ongoing deliveries.</p>
+            <button style={actionButtonStyle(activePanel === 'active-deliveries', '#10b981')} onClick={() => setActivePanel('active-deliveries')}>
+              Active Deliveries {deliveries.length > 0 && `(${deliveries.length})`}
+            </button>
+          </div>
+        </div>
+
+        {/* Workspace */}
         <div style={workspaceCardStyle}>
           <div>
             <h2 style={{ margin: 0, color: '#1a365d' }}>Workspace</h2>
