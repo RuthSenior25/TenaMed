@@ -197,35 +197,6 @@ const Login = () => {
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
 
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/create-dispatcher`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' }
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                      alert(`Dispatcher created!\nEmail: ${data.credentials.email}\nPassword: ${data.credentials.password}\n\nYou can now login.`);
-                    } else {
-                      alert('Failed to create dispatcher');
-                    }
-                  } catch (error) {
-                    console.error('Create dispatcher error:', error);
-                    alert('Create dispatcher failed');
-                  }
-                }}
-                className="w-full bg-gradient-to-r from-red-600 to-pink-600 dark:from-red-500 dark:to-pink-500 hover:from-red-700 hover:to-pink-700 text-white py-2 px-4 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                Create Dispatcher Account
-              </button>
-              <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                Creates hardcoded dispatcher: dispatcher@tenamed.com
-              </p>
-            </div>
-
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
               <Link
