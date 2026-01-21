@@ -4216,7 +4216,12 @@ const DispatcherDashboard = () => {
         return (
           <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, color: '#1a365d' }}>Pending Orders</h3>
+              <div>
+                <h3 style={{ margin: 0, color: '#1a365d' }}>Pharmacy Delivery Requests</h3>
+                <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                  Orders ready for delivery person assignment
+                </p>
+              </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   style={{ ...buttonBaseStyle, background: '#dc2626', fontSize: '12px', padding: '6px 12px' }}
@@ -4294,7 +4299,12 @@ const DispatcherDashboard = () => {
               </div>
             </div>
             {orders.length === 0 ? (
-              <p style={{ color: '#718096' }}>No pending orders</p>
+              <div style={{ textAlign: 'center', padding: '32px' }}>
+                <p style={{ color: '#718096', marginBottom: '8px' }}>No pharmacy delivery requests</p>
+                <p style={{ color: '#a0aec0', fontSize: '14px' }}>
+                  When pharmacies mark orders as "Ready for Pickup", they will appear here for assignment to delivery persons.
+                </p>
+              </div>
             ) : (
               <div style={{ display: 'grid', gap: '12px' }}>
                 {orders.map((order) => (
@@ -4316,6 +4326,16 @@ const DispatcherDashboard = () => {
                         <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
                           Address: {order.deliveryAddress?.street}, {order.deliveryAddress?.city}
                         </p>
+                        <div style={{ margin: '8px 0' }}>
+                          <p style={{ fontSize: '12px', fontWeight: 600, color: '#2d3748', marginBottom: '4px' }}>
+                            Medications ({order.medications?.length || 0}):
+                          </p>
+                          {order.medications?.map((med, index) => (
+                            <p key={index} style={{ fontSize: '11px', color: '#4a5568', margin: '2px 0' }}>
+                              • {med.name} - {med.quantity} {med.instructions && `(${med.instructions})`}
+                            </p>
+                          ))}
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
