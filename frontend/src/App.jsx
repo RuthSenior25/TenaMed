@@ -4319,7 +4319,12 @@ const DispatcherDashboard = () => {
   // Fetch analytics
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/analytics`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/analytics`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       const data = await response.json();
       if (data.success) {
         setAnalytics(data.data);
