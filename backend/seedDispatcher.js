@@ -4,7 +4,7 @@ const User = require('./models/User');
 
 // Hardcoded dispatcher credentials
 const DISPATCHER_CREDENTIALS = {
-  email: 'dispatcher@tenamed.com',
+  email: 'dis@gmail.com',
   password: 'TenaMed1',
   username: 'dispatcher',
   role: 'dispatcher',
