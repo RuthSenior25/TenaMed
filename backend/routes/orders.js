@@ -29,7 +29,7 @@ router.post('/', auth.authenticate, async (req, res) => {
       deliveryAddress,
       notes,
       totalAmount,
-      status: 'ready',
+      status: 'pending',
       deliveryStatus: 'pending'
     });
 

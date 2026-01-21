@@ -183,7 +183,7 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
     console.log('=== DISPATCHER FETCHING ORDERS ===');
     
     const orders = await Order.find({ 
-      status: 'ready',
+      status: { $in: ['pending', 'ready'] },
       deliveryStatus: 'pending'
     })
     .populate('pharmacyId', 'pharmacyName email profile')
