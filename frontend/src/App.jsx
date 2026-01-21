@@ -4265,7 +4265,12 @@ const DispatcherDashboard = () => {
   // Fetch pending orders
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/orders`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/orders`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       const data = await response.json();
       if (data.success) {
         setOrders(data.data);
@@ -4278,7 +4283,12 @@ const DispatcherDashboard = () => {
   // Fetch available drivers
   const fetchDrivers = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/drivers`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/drivers`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       const data = await response.json();
       if (data.success) {
         setDrivers(data.data);
@@ -4291,7 +4301,12 @@ const DispatcherDashboard = () => {
   // Fetch active deliveries
   const fetchDeliveries = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/deliveries`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/deliveries`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        }
+      });
       const data = await response.json();
       if (data.success) {
         setDeliveries(data.data);
@@ -4318,9 +4333,13 @@ const DispatcherDashboard = () => {
   const assignDriver = async (orderId, driverId) => {
     try {
       setIsLoading(true);
+      const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/assign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
         body: JSON.stringify({ orderId, driverId })
       });
       const data = await response.json();
