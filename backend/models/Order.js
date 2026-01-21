@@ -8,7 +8,7 @@ const orderSchema = new mongoose.Schema({
   },
   pharmacyId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Pharmacy',
+    ref: 'User',
     required: true
   },
   medications: [{
