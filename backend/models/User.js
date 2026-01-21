@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['patient', 'pharmacy', 'admin', 'dispatcher', 'driver', 'system'],
+    enum: ['patient', 'pharmacy', 'admin', 'dispatcher', 'driver', 'delivery_person', 'system'],
     default: 'patient'
   },
   profile: {
@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema({
   isApproved: {
     type: Boolean,
     default: function() {
-      return this.role === 'patient' || this.role === 'admin' || this.role === 'driver';
+      return this.role === 'patient' || this.role === 'admin';
     }
   },
   lastLogin: { type: Date },
@@ -78,7 +78,7 @@ const userSchema = new mongoose.Schema({
   isAvailable: {
     type: Boolean,
     default: function() {
-      return this.role === 'driver';
+      return this.role === 'driver' || this.role === 'delivery_person';
     }
   },
   location: {

@@ -12,7 +12,7 @@ router.get('/pending-drivers', auth.authenticate, auth.checkRole(['dispatcher'])
     console.log('Fetching pending delivery persons for approval...');
     
     const pendingDrivers = await User.find({ 
-      role: 'driver',
+      role: 'delivery_person',
       isApproved: false 
     }).select('email profile firstName lastName createdAt vehicleType licensePlate');
 
