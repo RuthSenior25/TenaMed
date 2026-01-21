@@ -233,6 +233,7 @@ router.get('/drivers', auth.authenticate, auth.checkRole(['dispatcher']), async 
 router.post('/assign', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const { orderId, driverId } = req.body;
+    console.log('🚗 ASSIGN DRIVER REQUEST:', { orderId, driverId, user: req.user.email });
 
     // Update order with driver assignment
     const order = await Order.findByIdAndUpdate(
@@ -258,6 +259,8 @@ router.post('/assign', auth.authenticate, auth.checkRole(['dispatcher']), async 
 
     // Update driver availability
     await User.findByIdAndUpdate(driverId, { isAvailable: false });
+
+    console.log('✅ Driver assigned successfully:', { orderId, driverId });
 
     res.json({
       success: true,

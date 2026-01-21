@@ -4338,6 +4338,8 @@ const DispatcherDashboard = () => {
   const assignDriver = async (orderId, driverId) => {
     try {
       setIsLoading(true);
+      console.log('🚗 Assigning driver:', { orderId, driverId });
+      
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/dispatcher/assign`, {
         method: 'POST',
@@ -4347,7 +4349,11 @@ const DispatcherDashboard = () => {
         },
         body: JSON.stringify({ orderId, driverId })
       });
+      
+      console.log('📥 Response status:', response.status);
       const data = await response.json();
+      console.log('📥 Response data:', data);
+      
       if (data.success) {
         alert('Driver assigned successfully!');
         fetchOrders();
@@ -4355,10 +4361,12 @@ const DispatcherDashboard = () => {
         fetchDeliveries();
         setSelectedOrder(null);
         setSelectedDriver(null);
+      } else {
+        alert('Failed to assign driver: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error assigning driver:', error);
-      alert('Failed to assign driver');
+      alert('Failed to assign driver: ' + error.message);
     } finally {
       setIsLoading(false);
     }
