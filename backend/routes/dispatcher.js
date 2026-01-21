@@ -219,7 +219,8 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
 router.get('/drivers', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const drivers = await User.find({ 
-      role: 'driver',
+      role: 'delivery_person',
+      isApproved: true,
       isAvailable: true 
     }).select('email profile location vehicleType isAvailable');
 

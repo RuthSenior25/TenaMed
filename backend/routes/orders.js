@@ -29,7 +29,8 @@ router.post('/', auth.authenticate, async (req, res) => {
       deliveryAddress,
       notes,
       totalAmount,
-      status: 'pending'
+      status: 'ready',
+      deliveryStatus: 'pending'
     });
 
     await order.save();
