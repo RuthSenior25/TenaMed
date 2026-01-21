@@ -193,7 +193,7 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
 
     console.log(`🔍 Dispatcher found ${orders.length} orders`);
     orders.forEach(order => {
-      console.log(`📦 Order ${order._id.slice(-8)}: ${order.status} / ${order.deliveryStatus} - ${order.pharmacyId?.pharmacyName || 'Unknown'}`);
+      console.log(`📦 Order ${order._id.toString().slice(-8)}: ${order.status} / ${order.deliveryStatus} - ${order.pharmacyId?.pharmacyName || 'Unknown'}`);
     });
     
     res.json({
