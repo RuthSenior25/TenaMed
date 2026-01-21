@@ -2984,6 +2984,16 @@ const [inventory, setInventory] = useState([
 
 const [ordersQueue, setOrdersQueue] = useState([]);
 
+// Supplier ordering state
+const [suppliers, setSuppliers] = useState([]);
+const [supplierOrders, setSupplierOrders] = useState([]);
+const [supplierOrderForm, setSupplierOrderForm] = useState({
+  supplierId: '',
+  medicines: [],
+  notes: '',
+  deliveryAddress: ''
+});
+
 // Fetch pharmacy orders from backend
 const fetchPharmacyOrders = async () => {
   try {
@@ -3006,7 +3016,80 @@ const fetchPharmacyOrders = async () => {
 // Fetch orders on component mount
 useEffect(() => {
   fetchPharmacyOrders();
+  fetchSuppliers();
+  fetchSupplierOrders();
 }, []);
+
+// Fetch available suppliers
+const fetchSuppliers = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/available`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      setSuppliers(data.data);
+    }
+  } catch (error) {
+    console.error('Error fetching suppliers:', error);
+  }
+};
+
+// Fetch supplier orders
+const fetchSupplierOrders = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier-orders/pharmacy-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      setSupplierOrders(data.data);
+    }
+  } catch (error) {
+    console.error('Error fetching supplier orders:', error);
+  }
+};
+
+// Create supplier order
+const createSupplierOrder = async (e) => {
+  e.preventDefault();
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier-orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(supplierOrderForm)
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      alert('Supplier order created successfully!');
+      setSupplierOrderForm({
+        supplierId: '',
+        medicines: [],
+        notes: '',
+        deliveryAddress: ''
+      });
+      fetchSupplierOrders();
+    } else {
+      alert('Failed to create supplier order: ' + (data.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error creating supplier order:', error);
+    alert('Failed to create supplier order');
+  }
+};
 
 // Update order status
 const updateOrderStatus = async (orderId, newStatus) => {
@@ -3385,6 +3468,112 @@ onChange={(e) => setFeedbackNote((prev) => ({ ...prev, note: e.target.value }))}
 </div>
 </div>
 );
+case 'supplier-orders':
+return (
+<div style={{ display: 'grid', gap: '18px' }}>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Create Supplier Order</h4>
+<form onSubmit={createSupplierOrder} style={{ display: 'grid', gap: '12px' }}>
+<div>
+<label style={{ display: 'block', marginBottom: '4px', color: '#4a5568', fontSize: '14px' }}>Select Supplier</label>
+<select
+value={supplierOrderForm.supplierId}
+onChange={(e) => setSupplierOrderForm((prev) => ({ ...prev, supplierId: e.target.value }))}
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', width: '100%' }}
+required
+>
+<option value="">Choose a supplier</option>
+{suppliers.map((supplier) => (
+<option key={supplier._id} value={supplier._id}>
+{supplier.profile?.firstName} {supplier.profile?.lastName} - {supplier.email}
+</option>
+))}
+</select>
+</div>
+<div>
+<label style={{ display: 'block', marginBottom: '4px', color: '#4a5568', fontSize: '14px' }}>Medicines (comma-separated)</label>
+<textarea
+value={supplierOrderForm.medicines.join(', ')}
+onChange={(e) => setSupplierOrderForm((prev) => ({ 
+...prev, 
+medicines: e.target.value.split(',').map(med => med.trim()).filter(med => med)
+}))}
+placeholder="e.g., Amoxicillin 500mg, Metformin 850mg, Insulin Pen"
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', width: '100%', minHeight: '80px' }}
+required
+/>
+</div>
+<div>
+<label style={{ display: 'block', marginBottom: '4px', color: '#4a5568', fontSize: '14px' }}>Delivery Address</label>
+<input
+type="text"
+value={supplierOrderForm.deliveryAddress}
+onChange={(e) => setSupplierOrderForm((prev) => ({ ...prev, deliveryAddress: e.target.value }))}
+placeholder="Pharmacy delivery address"
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', width: '100%' }}
+required
+/>
+</div>
+<div>
+<label style={{ display: 'block', marginBottom: '4px', color: '#4a5568', fontSize: '14px' }}>Notes</label>
+<textarea
+value={supplierOrderForm.notes}
+onChange={(e) => setSupplierOrderForm((prev) => ({ ...prev, notes: e.target.value }))}
+placeholder="Additional notes for the supplier"
+style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e0', width: '100%', minHeight: '60px' }}
+/>
+</div>
+<button type="submit" style={{ ...buttonBaseStyle, background: '#9333ea' }}>
+Create Supplier Order
+</button>
+</form>
+</div>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Your Supplier Orders</h4>
+<div style={{ display: 'grid', gap: '12px' }}>
+{supplierOrders.map((order) => (
+<div key={order._id} style={{ border: '1px solid #edf2f7', borderRadius: '8px', padding: '12px' }}>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+<div>
+<div style={{ fontWeight: 600, color: '#2d3748' }}>
+Order to: {order.supplierId?.profile?.firstName} {order.supplierId?.profile?.lastName}
+</div>
+<div style={{ fontSize: '12px', color: '#718096' }}>
+{new Date(order.createdAt).toLocaleDateString()}
+</div>
+</div>
+<span style={{ 
+padding: '4px 8px', 
+borderRadius: '4px', 
+fontSize: '12px', 
+fontWeight: 600,
+backgroundColor: order.status === 'pending' ? '#fef3c7' : order.status === 'approved' ? '#d1fae5' : '#fee2e2',
+color: order.status === 'pending' ? '#92400e' : order.status === 'approved' ? '#065f46' : '#991b1b'
+}}>
+{order.status}
+</span>
+</div>
+<div style={{ marginBottom: '8px' }}>
+<div style={{ fontSize: '14px', color: '#4a5568', marginBottom: '4px' }}>
+<strong>Medicines:</strong> {order.medicines?.join(', ')}
+</div>
+{order.notes && (
+<div style={{ fontSize: '13px', color: '#718096' }}>
+<strong>Notes:</strong> {order.notes}
+</div>
+)}
+</div>
+</div>
+))}
+{supplierOrders.length === 0 && (
+<p style={{ margin: 0, color: '#a0aec0', textAlign: 'center', padding: '20px' }}>
+No supplier orders yet. Create your first order above.
+</p>
+)}
+</div>
+</div>
+</div>
+);
 default:
 return null;
 }
@@ -3450,6 +3639,13 @@ Manage shortages
 <p style={cardBodyStyle}>Advance dispensing workflows.</p>
 <button style={actionButtonStyle(activePanel === 'orders', '#1d4ed8')} onClick={() => setActivePanel('orders')}>
 View queue
+</button>
+</div>
+<div style={cardBaseStyle}>
+<h3 style={cardTitleStyle}>Supplier Orders</h3>
+<p style={cardBodyStyle}>Order medicines from suppliers.</p>
+<button style={actionButtonStyle(activePanel === 'supplier-orders', '#9333ea')} onClick={() => setActivePanel('supplier-orders')}>
+Order from Suppliers
 </button>
 </div>
 <div style={cardBaseStyle}>
