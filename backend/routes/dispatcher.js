@@ -402,4 +402,106 @@ router.get('/analytics', auth.authenticate, auth.checkRole(['dispatcher']), asyn
   }
 });
 
+// Test endpoint to debug Order model
+router.get('/test-orders', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
+  try {
+    console.log('=== TESTING ORDER MODEL ===');
+    
+    // Test 1: Simple count
+    const totalCount = await Order.countDocuments();
+    console.log('Total orders:', totalCount);
+    
+    // Test 2: Simple find without populate
+    const simpleOrders = await Order.find({}).limit(1);
+    console.log('Sample order exists:', simpleOrders.length > 0);
+    
+    if (simpleOrders.length > 0) {
+      console.log('Sample order structure:', Object.keys(simpleOrders[0].toObject()));
+    }
+    
+    // Test 3: Try the problematic query step by step
+    const statusQuery = { status: { $in: ['pending', 'ready'] }, deliveryStatus: 'pending' };
+    console.log('Query filter:', statusQuery);
+    
+    const filteredOrders = await Order.find(statusQuery).limit(1);
+    console.log('Filtered orders count:', filteredOrders.length);
+    
+    res.json({
+      success: true,
+      message: 'Order model test completed',
+      data: {
+        totalCount,
+        hasOrders: simpleOrders.length > 0,
+        filteredCount: filteredOrders.length,
+        sampleOrder: simpleOrders[0] ? {
+          id: simpleOrders[0]._id,
+          status: simpleOrders[0].status,
+          deliveryStatus: simpleOrders[0].deliveryStatus,
+          pharmacyId: simpleOrders[0].pharmacyId
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('Order model test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Order model test failed', 
+      error: error.message 
+    });
+  }
+});
+
+// Create hardcoded dispatcher for testing
+router.post('/create-hardcoded-dispatcher', async (req, res) => {
+  try {
+    console.log('Creating hardcoded dispatcher...');
+    
+    // Check if dispatcher already exists
+    const existingDispatcher = await User.findOne({ email: 'dis@gmail.com' });
+    if (existingDispatcher) {
+      return res.json({
+        success: true,
+        message: 'Dispatcher already exists',
+        credentials: {
+          email: 'dis@gmail.com',
+          password: 'dispatcher123'
+        }
+      });
+    }
+
+    // Create dispatcher
+    const dispatcher = new User({
+      email: 'dis@gmail.com',
+      password: 'dispatcher123',
+      role: 'dispatcher',
+      isApproved: true,
+      profile: {
+        firstName: 'Dispatcher',
+        lastName: 'Admin',
+        phone: '+251900000000'
+      }
+    });
+
+    await dispatcher.save();
+    
+    console.log('✅ Hardcoded dispatcher created successfully');
+
+    res.json({
+      success: true,
+      message: 'Dispatcher created successfully',
+      credentials: {
+        email: 'dis@gmail.com',
+        password: 'dispatcher123'
+      }
+    });
+  } catch (error) {
+    console.error('Error creating hardcoded dispatcher:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create dispatcher', 
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;
