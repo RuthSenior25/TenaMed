@@ -569,7 +569,7 @@ router.get('/approved-pharmacies', async (req, res) => {
 });
 
 // Update driver availability
-router.put('/update-availability', authenticate, checkRole(['driver']), async (req, res) => {
+router.put('/update-availability', authenticate, checkRole(['delivery_person']), async (req, res) => {
   try {
     const { isAvailable } = req.body;
     

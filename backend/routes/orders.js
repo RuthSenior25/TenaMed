@@ -160,7 +160,7 @@ router.put('/:orderId/status', auth.authenticate, async (req, res) => {
 });
 
 // Get driver deliveries
-router.get('/my-deliveries', auth.authenticate, auth.checkRole(['driver']), async (req, res) => {
+router.get('/my-deliveries', auth.authenticate, auth.checkRole(['delivery_person']), async (req, res) => {
   try {
     console.log(`Fetching deliveries for driver: ${req.user._id}`);
     
@@ -186,7 +186,7 @@ router.get('/my-deliveries', auth.authenticate, auth.checkRole(['driver']), asyn
 });
 
 // Update delivery status (for drivers)
-router.put('/update-delivery/:deliveryId', auth.authenticate, auth.checkRole(['driver']), async (req, res) => {
+router.put('/update-delivery/:deliveryId', auth.authenticate, auth.checkRole(['delivery_person']), async (req, res) => {
   try {
     const { status } = req.body;
     const { deliveryId } = req.params;
@@ -207,7 +207,10 @@ router.put('/update-delivery/:deliveryId', auth.authenticate, auth.checkRole(['d
     const validTransitions = {
       'assigned': ['picked_up'],
       'picked_up': ['in_transit'],
-      'in_transit': ['delivered']
+      'in_transit': ['delivered_pending_approval'],
+      'delivered_pending_approval': [], // Can only be approved by patient
+      'delivered': [],
+      'cancelled': []
     };
 
     if (!validTransitions[delivery.status]?.includes(status)) {
@@ -245,6 +248,61 @@ router.put('/update-delivery/:deliveryId', auth.authenticate, auth.checkRole(['d
     res.status(500).json({ 
       success: false, 
       message: 'Failed to update delivery status', 
+      error: error.message 
+    });
+  }
+});
+
+// Approve delivery (for patients)
+router.put('/approve-delivery/:deliveryId', auth.authenticate, auth.checkRole(['patient']), async (req, res) => {
+  try {
+    const { deliveryId } = req.params;
+    
+    console.log(`Patient ${req.user._id} approving delivery ${deliveryId}`);
+
+    const delivery = await Delivery.findById(deliveryId)
+      .populate('orderId');
+    
+    if (!delivery) {
+      return res.status(404).json({ success: false, message: 'Delivery not found' });
+    }
+
+    // Check if patient owns this delivery
+    if (delivery.orderId.patientId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    // Check if delivery is pending approval
+    if (delivery.status !== 'delivered_pending_approval') {
+      return res.status(400).json({ success: false, message: 'Delivery is not pending approval' });
+    }
+
+    // Update delivery status to delivered
+    delivery.status = 'delivered';
+    delivery.deliveredAt = new Date();
+    await delivery.save();
+
+    // Update order status to delivered
+    await Order.findByIdAndUpdate(delivery.orderId._id, { 
+      status: 'delivered',
+      deliveryStatus: 'delivered'
+    });
+
+    // Make driver available again
+    await User.findByIdAndUpdate(delivery.driverId, { isAvailable: true });
+
+    console.log(`✅ Delivery ${deliveryId} approved by patient`);
+
+    res.json({
+      success: true,
+      message: 'Delivery approved successfully',
+      data: delivery
+    });
+  } catch (error) {
+    console.error('Error approving delivery:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to approve delivery', 
       error: error.message 
     });
   }

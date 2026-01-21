@@ -18,7 +18,7 @@ const deliverySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['assigned', 'picked_up', 'in_transit', 'delivered', 'cancelled'],
+    enum: ['assigned', 'picked_up', 'in_transit', 'delivered_pending_approval', 'delivered', 'cancelled'],
     default: 'assigned'
   },
   pickupLocation: {
