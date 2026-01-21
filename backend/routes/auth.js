@@ -88,7 +88,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       password,
       role,
       profile,
-      isApproved: role === 'patient' || role === 'admin', // Only auto-approve patients and admins
+      isApproved: role === 'patient' || role === 'admin' || role === 'supplier', // Auto-approve patients, admins, and suppliers
       status: role === 'pharmacy' || role === 'delivery_person' ? 'pending' : 'approved'
     };
 

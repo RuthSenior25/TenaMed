@@ -32,7 +32,7 @@ const validateUserRegistration = [
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   
   body('role')
-    .isIn(['patient', 'pharmacy', 'dispatcher', 'delivery_person'])
+    .isIn(['patient', 'pharmacy', 'dispatcher', 'delivery_person', 'supplier'])
     .withMessage('Invalid role specified'),
   
   body('profile.firstName')

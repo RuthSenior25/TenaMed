@@ -5152,6 +5152,199 @@ const DeliveryDashboard = () => {
   );
 };
 
+// Supplier Dashboard Component
+const SupplierDashboard = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [activePanel, setActivePanel] = useState('products');
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    totalProducts: 0,
+    activeOrders: 0,
+    totalRevenue: 0,
+    partnerPharmacies: 0
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch supplier products
+  const fetchProducts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/products`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setProducts(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  // Fetch supplier orders
+  const fetchOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/orders`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setOrders(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    fetchOrders();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const renderPanelContent = () => {
+    switch (activePanel) {
+      case 'products':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, color: '#1a365d' }}>My Products</h3>
+              <button
+                style={{ 
+                  background: '#3182ce', 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '8px 16px', 
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {/* TODO: Add product modal */}}
+              >
+                Add Product
+              </button>
+            </div>
+            {products.length === 0 ? (
+              <p style={{ color: '#718096' }}>No products added yet</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {products.map((product) => (
+                  <div key={product._id} style={{ border: '1px solid #edf2f7', borderRadius: '8px', padding: '12px' }}>
+                    <div style={{ fontWeight: 600, color: '#2d3748' }}>{product.name}</div>
+                    <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                      {product.genericName} - {product.strength.value}{product.strength.unit}
+                    </p>
+                    <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                      Category: {product.category} | Form: {product.form}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      case 'orders':
+        return (
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#1a365d' }}>Purchase Orders</h3>
+            {orders.length === 0 ? (
+              <p style={{ color: '#718096' }}>No purchase orders</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {orders.map((order) => (
+                  <div key={order._id} style={{ border: '1px solid #edf2f7', borderRadius: '8px', padding: '12px' }}>
+                    <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                      Order #{order._id.slice(-8)}
+                    </div>
+                    <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                      Pharmacy: {order.pharmacyId?.pharmacyName}
+                    </p>
+                    <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+                      Total: ${order.totalAmount}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      
+      default:
+        return <div>Panel content</div>;
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#f7fafc' }}>
+      {/* Header */}
+      <div style={{ backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', padding: '16px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ margin: 0, color: '#2d3748', fontSize: '24px' }}>Supplier Dashboard</h1>
+            <p style={{ margin: '4px 0 0', color: '#718096', fontSize: '14px' }}>
+              Manage your pharmaceutical products and orders
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              backgroundColor: '#e53e3e',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div style={{ backgroundColor: 'white', padding: '16px 24px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '24px' }}>
+          {['products', 'orders'].map((panel) => (
+            <button
+              key={panel}
+              onClick={() => setActivePanel(panel)}
+              style={{
+                backgroundColor: activePanel === panel ? '#3182ce' : 'transparent',
+                color: activePanel === panel ? 'white' : '#4a5568',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                textTransform: 'capitalize'
+              }}
+            >
+              {panel}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '24px' }}>
+        {renderPanelContent()}
+      </div>
+    </div>
+  );
+};
+
 // Role-based dashboard router
 const DashboardRouter = () => {
   const { user } = useAuth();
@@ -5238,6 +5431,8 @@ case 'dispatcher':
   return <DispatcherDashboard />;
 case 'delivery_person':
   return <DriverDashboard />;
+case 'supplier':
+  return <SupplierDashboard />;
 case 'government':
 return (
 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">

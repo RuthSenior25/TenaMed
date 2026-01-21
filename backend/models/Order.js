@@ -15,7 +15,11 @@ const orderSchema = new mongoose.Schema({
     name: String,
     quantity: Number,
     price: Number,
-    instructions: String
+    instructions: String,
+    supplierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
   }],
   totalAmount: {
     type: Number,
