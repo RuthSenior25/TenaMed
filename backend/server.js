@@ -58,6 +58,7 @@ app.use(helmet());
 
 // Apply CORS with options
 app.use(cors(corsOptions));
+console.log('🔧 CORS methods:', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
