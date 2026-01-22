@@ -1,7 +1,9 @@
 {
     "version": "0.1.0",
     "name": "tenamed-frontend",
- "scripts": {
+    "version": "1.0.0",
+    "description": "TenaMed Healthcare Platform Frontend - Deployed",
+    "scripts": {
   "dev": "vite",
   "build": "node build.js",
   "preview": "vite preview",
