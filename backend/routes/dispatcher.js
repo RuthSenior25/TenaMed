@@ -248,11 +248,14 @@ router.post('/assign', auth.authenticate, auth.checkRole(['dispatcher']), async 
      .populate('patientId', 'email profile')
      .populate('assignedDriver', 'email profile');
 
-    // Create delivery record
+    // Create delivery record with required fields
     const delivery = new Delivery({
       orderId: orderId,
       driverId: driverId,
+      pharmacyId: order.pharmacyId, // Get from order
       status: 'assigned',
+      pickupLocation: order.pharmacyId?.pharmacyLocation?.address || 'Pharmacy Address', // Get from pharmacy
+      deliveryLocation: order.deliveryAddress || 'Patient Address', // Get from order
       assignedAt: new Date()
     });
     await delivery.save();
