@@ -241,7 +241,7 @@ const AdminDashboard = () => {
   const handleApprovePharmacy = async (pharmacyId) => {
     try {
       setIsProcessing(true);
-      await api.patch(`/pharmacies/${pharmacyId}`, { isApproved: true });
+      await api.patch(`/auth/pharmacies/${pharmacyId}`, { status: 'approved' });
       toast.success('Pharmacy approved successfully');
       await fetchPharmacyRequests(); // Refresh the list
     } catch (error) {
@@ -256,9 +256,8 @@ const AdminDashboard = () => {
   const handleRejectPharmacy = async (pharmacyId, reason) => {
     try {
       setIsProcessing(true);
-      await api.patch(`/pharmacies/${pharmacyId}`, { 
-        isApproved: false,
-        isActive: false,
+      await api.patch(`/auth/pharmacies/${pharmacyId}`, { 
+        status: 'rejected',
         rejectionReason: reason
       });
       toast.success('Pharmacy rejected successfully');
