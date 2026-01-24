@@ -723,15 +723,19 @@ const fetchDeliveries = async () => {
         id: order._id,
         medication: order.medications ? order.medications.map(med => med.name).join(', ') : 'Order',
         quantity: order.medications ? order.medications.reduce((sum, med) => sum + med.quantity, 0) : 1,
-        courier: order.assignedDriver ? order.assignedDriver.name : 'Pending Assignment',
+        courier: order.delivery?.driverId ? order.delivery.driverId.profile?.firstName + ' ' + order.delivery.driverId.profile?.lastName : 
+                 order.assignedDriver ? order.assignedDriver.profile?.firstName + ' ' + order.assignedDriver.profile?.lastName : 'Pending Assignment',
         eta: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'in_transit' ? 'Out for delivery' : 
+               order.deliveryStatus === 'picked_up' ? 'Picked up' :
                order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
         status: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'out_for_delivery' ? 'Out for delivery' : 
+               order.deliveryStatus === 'in_transit' ? 'Out for delivery' : 
+               order.deliveryStatus === 'picked_up' ? 'Picked up' :
                order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
         createdAt: order.createdAt,
-        pharmacy: order.pharmacyId?.pharmacyName || 'Unknown Pharmacy'
+        pharmacy: order.pharmacyId?.pharmacyName || 'Unknown Pharmacy',
+        deliveryStatus: order.deliveryStatus
       }));
       setDeliveries(deliveryData);
     }

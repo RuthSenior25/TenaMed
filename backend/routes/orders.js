@@ -60,11 +60,26 @@ router.get('/my-orders', auth.authenticate, async (req, res) => {
   try {
     const orders = await Order.find({ patientId: req.user._id })
       .populate('pharmacyId', 'pharmacyName email profile')
+      .populate('assignedDriver', 'email profile')
       .sort({ createdAt: -1 });
+
+    // Get delivery status for each order
+    const ordersWithDeliveryStatus = await Promise.all(
+      orders.map(async (order) => {
+        const delivery = await Delivery.findOne({ orderId: order._id })
+          .populate('driverId', 'email profile');
+        
+        return {
+          ...order.toObject(),
+          deliveryStatus: delivery ? delivery.status : order.deliveryStatus,
+          delivery: delivery
+        };
+      })
+    );
 
     res.json({
       success: true,
-      data: orders
+      data: ordersWithDeliveryStatus
     });
   } catch (error) {
     console.error('Error fetching orders:', error);
