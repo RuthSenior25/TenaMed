@@ -232,6 +232,25 @@ router.post('/login', validateUserLogin, async (req, res) => {
       });
     }
 
+    // Hardcoded government credentials for development
+    if (email === 'government@tenamed.com' && password === 'TenaMed2024!') {
+      console.log('✅ Government login successful (hardcoded credentials)');
+      return res.json({
+        message: 'Login successful',
+        token: 'government-hardcoded-token-' + Date.now(),
+        user: {
+          id: 'government-001',
+          username: 'government',
+          email: 'government@tenamed.com',
+          role: 'government',
+          profile: {
+            firstName: 'Government',
+            lastName: 'Official'
+          }
+        }
+      });
+    }
+
     // Find user by email
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
