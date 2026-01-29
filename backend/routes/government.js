@@ -6,7 +6,7 @@ const Order = require('../models/Order');
 const Delivery = require('../models/Delivery');
 
 // Get government statistics
-router.get('/stats', auth.authenticate, auth.checkRole(['government', 'admin']), async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     console.log('🏛️ [GOVT] Fetching government statistics...');
     

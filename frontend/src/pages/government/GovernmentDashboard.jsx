@@ -29,18 +29,26 @@ const GovernmentDashboard = () => {
   const fetchGovernmentStats = async () => {
     try {
       const token = localStorage.getItem('token');
+      console.log(' [GOVT] Fetching stats with token:', token ? 'Present' : 'Missing');
+      
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/government/stats`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : ''
         }
       });
 
+      console.log(' [GOVT] API Response status:', response.status);
       const data = await response.json();
+      console.log(' [GOVT] API Response data:', data);
+      
       if (data.success) {
         setStats(data.data);
+        console.log(' [GOVT] Stats updated:', data.data);
+      } else {
+        console.error(' [GOVT] API returned error:', data);
       }
     } catch (error) {
-      console.error('Error fetching government stats:', error);
+      console.error(' [GOVT] Error fetching government stats:', error);
     } finally {
       setIsLoading(false);
     }
