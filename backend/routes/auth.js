@@ -316,6 +316,45 @@ router.get('/me', async (req, res) => {
     }
 
     const token = authHeader.substring(7);
+    
+    // Handle hardcoded tokens for development
+    if (token.startsWith('government-hardcoded-token-')) {
+      return res.json({
+        user: {
+          id: 'government-001',
+          username: 'government',
+          email: 'government@tenamed.com',
+          role: 'government',
+          profile: {
+            firstName: 'Government',
+            lastName: 'Official'
+          },
+          isActive: true,
+          isApproved: true
+        },
+        pharmacy: null
+      });
+    }
+    
+    if (token.startsWith('admin-hardcoded-token-')) {
+      return res.json({
+        user: {
+          id: 'admin-001',
+          username: 'admin',
+          email: 'admin@tenamed.com',
+          role: 'admin',
+          profile: {
+            firstName: 'Admin',
+            lastName: 'User'
+          },
+          isActive: true,
+          isApproved: true
+        },
+        pharmacy: null
+      });
+    }
+    
+    // Normal JWT verification for other users
     const { verifyToken } = require('../middleware/auth');
     const decoded = verifyToken(token);
 
