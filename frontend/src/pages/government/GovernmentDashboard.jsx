@@ -6,12 +6,19 @@ const GovernmentDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
-    complianceRate: 0,
+    totalPharmacies: 0,
     activePharmacies: 0,
+    pendingPharmacies: 0,
+    totalPatients: 0,
+    totalDrivers: 0,
+    activeDrivers: 0,
+    totalOrders: 0,
+    completedDeliveries: 0,
+    pendingDeliveries: 0,
+    complianceRate: 0,
+    deliverySuccessRate: 0,
     monthlyGrowth: 0,
-    totalInspections: 0,
-    pendingInspections: 0,
-    violationsReported: 0
+    systemStatus: 'operational'
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -76,18 +83,19 @@ const GovernmentDashboard = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <h3 className="font-medium text-lg text-gray-900 dark:text-white mb-2">Pharmacy Compliance</h3>
-            <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{stats.complianceRate}%</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Overall Compliance Rate</p>
+            <h3 className="font-medium text-lg text-gray-900 dark:text-white mb-2">Total Pharmacies</h3>
+            <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{stats.totalPharmacies}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Registered Pharmacies</p>
             <div className="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500" style={{ width: `${stats.complianceRate}%` }}></div>
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stats.complianceRate}% compliance rate</p>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
             <h3 className="font-medium text-lg text-gray-900 dark:text-white mb-2">Active Pharmacies</h3>
             <p className="text-4xl font-bold text-green-600 dark:text-green-400">{stats.activePharmacies}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Registered & Active</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Approved & Operating</p>
             <div className="mt-4">
               <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 +{stats.monthlyGrowth} this month
@@ -96,27 +104,37 @@ const GovernmentDashboard = () => {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-            <h3 className="font-medium text-lg text-gray-900 dark:text-white mb-2">Pending Inspections</h3>
-            <p className="text-4xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingInspections}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Due this week</p>
-            <button className="mt-4 px-3 py-1 text-sm bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors">
-              View Schedule
-            </button>
+            <h3 className="font-medium text-lg text-gray-900 dark:text-white mb-2">Pending Approvals</h3>
+            <p className="text-4xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingPharmacies}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Awaiting Review</p>
+            <div className="mt-4">
+              <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                {stats.totalPatients} patients registered
+              </span>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
             <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Inspection Summary</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">System Overview</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalInspections}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Inspections</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalOrders}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Orders</p>
                 </div>
                 <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.violationsReported}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Violations Reported</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completedDeliveries}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Completed Deliveries</p>
+                </div>
+                <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingDeliveries}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Pending Deliveries</p>
+                </div>
+                <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.deliverySuccessRate}%</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Success Rate</p>
                 </div>
               </div>
               <button className="mt-4 w-full py-2 text-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
@@ -128,29 +146,57 @@ const GovernmentDashboard = () => {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Regulatory Actions</h2>
-                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full">
-                  Active
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">System Status</h2>
+                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full">
+                  {stats.systemStatus}
                 </span>
               </div>
               <div className="space-y-4">
                 <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
                   <div className="flex items-start">
                     <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                      R
+                      P
                     </div>
                     <div className="ml-3">
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Regulatory Monitoring</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">System monitoring pharmacy compliance in real-time</p>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Pharmacies</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{stats.activePharmacies} active, {stats.pendingPharmacies} pending approval</p>
                       <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
-                        <span>Live monitoring active</span>
+                        <span>Compliance rate: {stats.complianceRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+                      D
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Delivery Personnel</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{stats.activeDrivers} active drivers</p>
+                      <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
+                        <span>{stats.totalDrivers} total registered</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                      O
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Order Processing</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{stats.pendingDeliveries} deliveries in progress</p>
+                      <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
+                        <span>{stats.deliverySuccessRate}% success rate</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               <button className="mt-4 w-full py-2 text-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
-                Manage Regulatory Actions
+                View System Details
               </button>
             </div>
           </div>

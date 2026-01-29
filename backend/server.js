@@ -115,6 +115,7 @@ app.use('/api/dispatcher', require('./routes/dispatcher'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/supplier', require('./routes/supplier'));
 app.use('/api/supplier-orders', require('./routes/supplier-orders'));
+app.use('/api/government', require('./routes/government'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
