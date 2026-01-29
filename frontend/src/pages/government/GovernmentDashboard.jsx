@@ -3,8 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const GovernmentDashboard = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
+  const [user, setUser] = useState({
+    firstName: 'Government',
+    lastName: 'Official',
+    email: 'government@tenamed.com'
+  });
   const [stats, setStats] = useState({
     totalPharmacies: 0,
     activePharmacies: 0,
