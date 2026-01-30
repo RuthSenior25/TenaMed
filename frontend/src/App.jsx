@@ -456,6 +456,7 @@ const [selectedPharmacy, setSelectedPharmacy] = useState(null);
 const [orderForm, setOrderForm] = useState({
   medications: [{ name: '', quantity: 1, instructions: '' }],
   deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+  deliveryDate: '',
   notes: ''
 });
 const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -1269,9 +1270,9 @@ const handlePayment = async () => {
       setOrderForm({
         medications: [{ name: '', quantity: 1, instructions: '' }],
         deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+        deliveryDate: '',
         notes: ''
       });
-      setAvailabilityResults({});
       setPaymentMethod('cash');
       
       // Refresh orders
@@ -1359,6 +1360,7 @@ const submitOrderToPharmacy = async (pharmacyId) => {
       setOrderForm({
         medications: [{ name: '', quantity: 1, instructions: '' }],
         deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+        deliveryDate: '',
         notes: ''
       });
       // Refresh orders list
@@ -1424,6 +1426,7 @@ const handleOrderFromSearch = (searchResult) => {
       kebele: patientProfile?.address?.kebele || '',
       postalCode: patientProfile?.address?.postalCode || ''
     },
+    deliveryDate: '',
     notes: ''
   });
   
@@ -2605,6 +2608,17 @@ View Deliveries
       </div>
 
       <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Preferred Delivery Date:</label>
+        <input
+          type="date"
+          value={orderForm.deliveryDate}
+          onChange={(e) => setOrderForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
+          min={new Date().toISOString().split('T')[0]} // Minimum date is today
+          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Additional Notes:</label>
         <textarea
           placeholder="Any special instructions..."
@@ -2622,6 +2636,7 @@ View Deliveries
             setOrderForm({
               medications: [{ name: '', quantity: 1, instructions: '' }],
               deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+              deliveryDate: '',
               notes: ''
             });
           }}
@@ -2875,34 +2890,6 @@ Flag delay
 </div>
 </div>
 );
-case 'network':
-return (
-<div style={{ display: 'grid', gap: '18px' }}>
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Supplier directory</h4>
-<div style={{ display: 'grid', gap: '10px' }}>
-{supplierCatalog.map((supplier) => (
-<div key={supplier.id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '12px' }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<strong style={{ color: '#2d3748' }}>{supplier.name}</strong>
-<span style={{ color: '#f59e0b' }}>★ {supplier.rating}</span>
-</div>
-<p style={{ margin: '4px 0', color: '#4a5568' }}>Coverage: {supplier.coverage}</p>
-<p style={{ margin: 0, fontSize: '12px', color: '#718096' }}>Contact: {supplier.contact}</p>
-</div>
-))}
-</div>
-</div>
-<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Collaboration ideas</h4>
-<ul style={{ margin: 0, paddingLeft: '18px', color: '#4a5568', lineHeight: 1.6 }}>
-<li>Run shortage drills with pharmacies to plan contingency stock.</li>
-<li>Provide educational pricing sheets for transparency with patients.</li>
-<li>Partner with government to prioritize essential medicines.</li>
-</ul>
-</div>
-</div>
-);
 default:
 return null;
 }
@@ -2949,13 +2936,6 @@ View signals
 <p style={cardBodyStyle}>Simulate shipments to pharmacies.</p>
 <button style={actionButtonStyle(activePanel === 'transactions', '#38a169')} onClick={() => setActivePanel('transactions')}>
 Manage shipments
-</button>
-</div>
-<div style={cardBaseStyle}>
-<h3 style={cardTitleStyle}>Network</h3>
-<p style={cardBodyStyle}>Collaborate with peers.</p>
-<button style={actionButtonStyle(activePanel === 'network', '#9333ea')} onClick={() => setActivePanel('network')}>
-View partners
 </button>
 </div>
 </div>
@@ -3918,9 +3898,9 @@ const DriverDashboard = () => {
       const data = await response.json();
       if (data.success) {
         setDriverProfile(data.data);
-        // Check if driver is approved, if not, redirect to pending approval message
+        // Check if driver is approved, if not, show pending approval screen
         if (!data.data.isApproved) {
-          alert('Your driver account is pending approval. Please wait for dispatcher approval.');
+          return; // Don't proceed with dashboard
         }
       }
     } catch (error) {
@@ -4139,6 +4119,63 @@ const DriverDashboard = () => {
         return null;
     }
   };
+
+  // Show pending approval screen if driver is not approved
+  if (driverProfile && !driverProfile.isApproved) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-md p-8 text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Pending Approval</h2>
+            <p className="text-gray-600">
+              Thank you for registering as a delivery person. Your account is currently under review by our dispatcher team.
+              You'll receive an email notification once your account is approved and you can start accepting deliveries.
+            </p>
+          </div>
+          <div className="mt-6">
+            <button 
+              onClick={async () => {
+                try {
+                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/me`, {
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                  });
+
+                  if (!response.ok) throw new Error('Failed to check status');
+
+                  const userData = await response.json();
+
+                  if (userData.data?.isApproved) {
+                    alert('Congratulations! Your delivery person account has been approved. Please refresh the page.');
+                    window.location.reload();
+                  } else {
+                    alert('Your delivery person account is still under review. Please check back later.');
+                  }
+                } catch (error) {
+                  console.error('Error checking status:', error);
+                  alert('Failed to check status. Please try again.');
+                }
+              }}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              Check Status
+            </button>
+          </div>
+          <div className="mt-6 pt-6 border-t border-gray-100">
+            <p className="text-sm text-gray-500">
+              Need help? <a href="mailto:support@tenamed.com?subject=Delivery Person Approval Inquiry - Driver ID: ${driverProfile?.id || 'Unknown'}" className="text-blue-600 hover:underline">Contact support</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={dashboardShellStyle}>
@@ -5350,7 +5387,7 @@ You'll receive an email notification once your pharmacy is approved and you can 
 <button 
 onClick={async () => {
 try {
-const response = await fetch('/api/auth/me', {
+const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/me`, {
 headers: {
 'Authorization': `Bearer ${localStorage.getItem('token')}`
 }
@@ -5360,7 +5397,8 @@ if (!response.ok) throw new Error('Failed to check status');
 
 const userData = await response.json();
 
-if (userData.user?.isApproved) {
+if (userData.user?.isApproved || userData.user?.status === 'approved') {
+alert('Congratulations! Your pharmacy has been approved. Please refresh the page.');
 window.location.reload();
 } else {
 alert('Your pharmacy is still under review. Please check back later.');
@@ -5377,7 +5415,7 @@ Check Status
 </div>
 <div className="mt-6 pt-6 border-t border-gray-100">
 <p className="text-sm text-gray-500">
-Need help? <a href="mailto:support@tenamed.com" className="text-blue-600 hover:underline">Contact support</a>
+Need help? <a href="mailto:support@tenamed.com?subject=Pharmacy Approval Inquiry - Pharmacy ID: ${user?.id || 'Unknown'}" className="text-blue-600 hover:underline">Contact support</a>
 </p>
 </div>
 </div>
@@ -5398,35 +5436,7 @@ case 'delivery_person':
 case 'supplier':
   return <SupplierDashboard />;
 case 'government':
-return (
-<div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-<div className="max-w-7xl mx-auto">
-<div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
-<h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Government Dashboard</h1>
-<p className="text-gray-600 dark:text-gray-300">
-Welcome to the government oversight portal. Here you can monitor and manage regulatory compliance.
-</p>
-<div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-<div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg">
-<h3 className="font-medium text-blue-800 dark:text-blue-200">Pharmacy Compliance</h3>
-<p className="text-3xl font-bold text-blue-600 dark:text-blue-300 mt-2">92%</p>
-<p className="text-sm text-blue-600 dark:text-blue-300">Compliance Rate</p>
-</div>
-<div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg">
-<h3 className="font-medium text-green-800 dark:text-green-200">Active Pharmacies</h3>
-<p className="text-3xl font-bold text-green-600 dark:text-green-300 mt-2">156</p>
-<p className="text-sm text-green-600 dark:text-green-300">Active</p>
-</div>
-<div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg">
-<h3 className="font-medium text-amber-800 dark:text-amber-200">Pending Inspections</h3>
-<p className="text-3xl font-bold text-amber-600 dark:text-amber-300 mt-2">8</p>
-<p className="text-sm text-amber-600 dark:text-amber-300">Due this week</p>
-</div>
-</div>
-</div>
-</div>
-</div>
-);
+return <GovernmentDashboard />;
 default:
 return <div className="p-6">Invalid role: {user.role}</div>;
 }
