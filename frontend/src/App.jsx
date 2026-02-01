@@ -483,24 +483,13 @@ const [locationFilter, setLocationFilter] = useState({
   city: '',
   radius: 10
 });
-// Prescriptions functionality
-const [prescriptions, setPrescriptions] = useState([]);
-const [approvedPharmaciesForPrescriptions, setApprovedPharmaciesForPrescriptions] = useState([]);
-const [isLoadingPharmaciesForPrescriptions, setIsLoadingPharmaciesForPrescriptions] = useState(false);
+// Prescriptions functionality removed - endpoint doesn't exist
+// const [prescriptions, setPrescriptions] = useState([]);
 const [orders, setOrders] = useState([]);
 const [deliveries, setDeliveries] = useState([]);
 const [alerts, setAlerts] = useState([]);
 const [patientProfile, setPatientProfile] = useState(null);
-const [prescriptionForm, setPrescriptionForm] = useState({ 
-  drug: '', 
-  dosage: '', 
-  frequency: '', 
-  notes: '',
-  pharmacyId: '',
-  duration: '',
-  quantity: 1,
-  refills: 0
-});
+const [prescriptionForm, setPrescriptionForm] = useState({ drug: '', dosage: '', frequency: '', notes: '' });
 const [catalogQuery, setCatalogQuery] = useState('');
 const [catalogFilter, setCatalogFilter] = useState('');
 const createFilterShape = () => ({
@@ -694,32 +683,10 @@ const fetchPrescriptions = async () => {
     });
     const data = await response.json();
     if (data.success) {
-      setPrescriptions(data.data || []);
+      setPrescriptions(data.prescriptions || []);
     }
   } catch (error) {
     console.error('Error fetching prescriptions:', error);
-  }
-};
-
-// Fetch approved pharmacies for prescription selection
-const fetchApprovedPharmaciesForPrescriptions = async () => {
-  try {
-    setIsLoadingPharmaciesForPrescriptions(true);
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/prescriptions/pharmacies/approved`, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      }
-    });
-    const data = await response.json();
-    if (data.success) {
-      setApprovedPharmaciesForPrescriptions(data.data || []);
-    }
-  } catch (error) {
-    console.error('Error fetching approved pharmacies for prescriptions:', error);
-  } finally {
-    setIsLoadingPharmaciesForPrescriptions(false);
   }
 };
 
@@ -835,8 +802,7 @@ const fetchApprovedPharmacies = async () => {
 useEffect(() => {
   fetchApprovedPharmacies();
   fetchPatientProfile();
-  fetchPrescriptions();
-  fetchApprovedPharmaciesForPrescriptions();
+  // fetchPrescriptions(); // Removed - endpoint doesn't exist
   fetchOrders();
   fetchDeliveries();
 }, []); // Only run on mount
@@ -1162,10 +1128,7 @@ setSelectedMedicine(null);
 
 const handlePrescriptionSubmit = async (event) => {
   event.preventDefault();
-  if (!prescriptionForm.drug.trim() || !prescriptionForm.dosage.trim() || !prescriptionForm.pharmacyId) {
-    alert('Please fill in all required fields including pharmacy selection');
-    return;
-  }
+  if (!prescriptionForm.drug.trim() || !prescriptionForm.dosage.trim()) return;
   
   try {
     const token = localStorage.getItem('token');
@@ -1176,17 +1139,9 @@ const handlePrescriptionSubmit = async (event) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        patientId: user?._id,
-        pharmacyId: prescriptionForm.pharmacyId,
-        drug: {
-          name: prescriptionForm.drug.trim(),
-          dosage: prescriptionForm.dosage.trim(),
-          frequency: prescriptionForm.frequency.trim(),
-          instructions: prescriptionForm.notes || '',
-          duration: prescriptionForm.duration || '',
-          quantity: prescriptionForm.quantity || 1,
-          refills: prescriptionForm.refills || 0
-        },
+        drug: prescriptionForm.drug.trim(),
+        dosage: prescriptionForm.dosage.trim(),
+        frequency: prescriptionForm.frequency.trim(),
         notes: prescriptionForm.notes || ''
       })
     });
@@ -1195,52 +1150,15 @@ const handlePrescriptionSubmit = async (event) => {
     if (data.success) {
       // Refresh prescriptions list
       await fetchPrescriptions();
-      setPrescriptionForm({ 
-        drug: '', 
-        dosage: '', 
-        frequency: '', 
-        notes: '',
-        pharmacyId: '',
-        duration: '',
-        quantity: 1,
-        refills: 0
-      });
+      setPrescriptionForm({ drug: '', dosage: '', frequency: '', notes: '' });
       setActivePanel('prescriptions');
-      recordAlert(`${prescriptionForm.drug} prescription created successfully at ${approvedPharmaciesForPrescriptions.find(p => p._id === prescriptionForm.pharmacyId)?.pharmacyName || 'selected pharmacy'}.`);
+      recordAlert(`${prescriptionForm.drug} prescription added successfully.`);
     } else {
-      recordAlert('Failed to create prescription: ' + (data.message || 'Unknown error'));
+      recordAlert('Failed to add prescription: ' + (data.message || 'Unknown error'));
     }
   } catch (error) {
-    console.error('Error creating prescription:', error);
-    recordAlert('Failed to create prescription. Please try again.');
-  }
-};
-
-const handleRequestRefill = async (prescriptionId) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/prescriptions/${prescriptionId}/refill`, {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        notes: 'Refill requested via patient portal'
-      })
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      // Refresh prescriptions list
-      await fetchPrescriptions();
-      recordAlert(`Refill request sent for prescription ${prescriptionId}.`);
-    } else {
-      recordAlert('Failed to request refill: ' + (data.message || 'Unknown error'));
-    }
-  } catch (error) {
-    console.error('Error requesting refill:', error);
-    recordAlert('Failed to request refill. Please try again.');
+    console.error('Error submitting prescription:', error);
+    recordAlert('Failed to add prescription. Please try again.');
   }
 };
 
@@ -1371,6 +1289,16 @@ const handlePayment = async () => {
   } catch (error) {
     console.error('Error processing payment:', error);
     alert('Payment processing failed. Please try again.');
+  } finally {
+    setIsProcessingPayment(false);
+  }
+};
+
+const handleRequestRefill = (rxId) => {
+setPrescriptions((prev) =>
+prev.map((rx) => (rx.id === rxId ? { ...rx, refills: rx.refills + 1 } : rx))
+);
+recordAlert(`Refill request sent for ${rxId}.`);
 };
 
 const handleSelectMedicine = (med) => {
@@ -2112,206 +2040,6 @@ Order Medicine
 View Catalog
 </button>
 </div>
-</div>
-);
-case 'prescriptions':
-return (
-<div style={{ display: 'grid', gap: '18px' }}>
-  {/* Add Prescription Form */}
-  <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-    <h4 style={{ margin: '0 0 16px', color: '#1a365d' }}>Add New Prescription</h4>
-    <form onSubmit={handlePrescriptionSubmit} style={{ display: 'grid', gap: '12px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Medicine Name *</label>
-          <input
-            type="text"
-            placeholder="e.g., Amoxicillin 500mg"
-            value={prescriptionForm.drug}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, drug: e.target.value }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-            required
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Dosage *</label>
-          <input
-            type="text"
-            placeholder="e.g., 500mg"
-            value={prescriptionForm.dosage}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, dosage: e.target.value }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-            required
-          />
-        </div>
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Frequency</label>
-          <input
-            type="text"
-            placeholder="e.g., Twice daily"
-            value={prescriptionForm.frequency}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, frequency: e.target.value }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Pharmacy *</label>
-          <select
-            value={prescriptionForm.pharmacyId}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, pharmacyId: e.target.value }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-            required
-          >
-            <option value="">Select pharmacy</option>
-            {approvedPharmaciesForPrescriptions.map(pharmacy => (
-              <option key={pharmacy._id} value={pharmacy._id}>
-                {pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Duration</label>
-          <input
-            type="text"
-            placeholder="e.g., 30 days"
-            value={prescriptionForm.duration}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, duration: e.target.value }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Quantity</label>
-          <input
-            type="number"
-            min="1"
-            value={prescriptionForm.quantity}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Refills</label>
-          <input
-            type="number"
-            min="0"
-            value={prescriptionForm.refills}
-            onChange={(e) => setPrescriptionForm(prev => ({ ...prev, refills: parseInt(e.target.value) || 0 }))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0' }}
-          />
-        </div>
-      </div>
-      
-      <div>
-        <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Instructions</label>
-        <textarea
-          placeholder="Special instructions for taking this medication..."
-          value={prescriptionForm.notes}
-          onChange={(e) => setPrescriptionForm(prev => ({ ...prev, notes: e.target.value }))}
-          style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e0', minHeight: '60px' }}
-        />
-      </div>
-      
-      <button
-        type="submit"
-        style={{
-          padding: '10px 20px',
-          backgroundColor: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontWeight: '600'
-        }}
-      >
-        Add Prescription
-      </button>
-    </form>
-  </div>
-
-  {/* Existing Prescriptions */}
-  <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-    <h4 style={{ margin: '0 0 16px', color: '#1a365d' }}>My Prescriptions</h4>
-    {prescriptions.length === 0 ? (
-      <p style={{ margin: 0, color: '#a0aec0' }}>No prescriptions found.</p>
-    ) : (
-      <div style={{ display: 'grid', gap: '12px' }}>
-        {prescriptions.map((prescription) => (
-          <div key={prescription._id} style={{ 
-            border: '1px solid #edf2f7', 
-            borderRadius: '10px', 
-            padding: '12px',
-            backgroundColor: '#ffffff'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '16px' }}>
-                  {prescription.drug?.name}
-                </div>
-                <p style={{ margin: '4px 0', color: '#4a5568', fontSize: '14px' }}>
-                  💊 {prescription.drug?.dosage} • {prescription.drug?.frequency}
-                </p>
-                <p style={{ margin: '4px 0', color: '#4a5568', fontSize: '14px' }}>
-                  🏥 {prescription.pharmacyId?.pharmacyName || prescription.pharmacyName || 'Pharmacy'}
-                </p>
-                <p style={{ margin: '4px 0', color: '#718096', fontSize: '12px' }}>
-                  📅 Prescribed: {new Date(prescription.prescribedDate || prescription.createdAt).toLocaleDateString()}
-                </p>
-                {prescription.drug?.refills > 0 && (
-                  <p style={{ margin: '4px 0', color: '#718096', fontSize: '12px' }}>
-                    🔄 Refills: {prescription.drug?.refills - prescription.drug?.refillsUsed || 0} of {prescription.drug?.refills} remaining
-                  </p>
-                )}
-                {prescription.drug?.instructions && (
-                  <p style={{ margin: '4px 0', color: '#718096', fontSize: '12px' }}>
-                    📋 {prescription.drug?.instructions}
-                  </p>
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                <span style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  backgroundColor: prescription.status === 'active' ? '#dcfce7' : 
-                                   prescription.status === 'pending_refill' ? '#fef3c7' : '#fee2e2',
-                  color: prescription.status === 'active' ? '#166534' : 
-                         prescription.status === 'pending_refill' ? '#92400e' : '#991b1b'
-                }}>
-                  {prescription.status === 'active' ? 'Active' : 
-                   prescription.status === 'pending_refill' ? 'Refill Requested' : prescription.status}
-                </span>
-                {prescription.drug?.refills > prescription.drug?.refillsUsed && (
-                  <button
-                    onClick={() => handleRequestRefill(prescription._id)}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    Request Refill
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
 </div>
 );
 case 'orders':
@@ -5937,12 +5665,12 @@ style: {
 background: '#ff4d4f',
 },
 },
-          }}
-        />
-        <AppContent />
-      </SupplyChainProvider>
-    </AuthProvider>
-  );
+}}
+/>
+<AppContent />
+</SupplyChainProvider>
+</AuthProvider>
+);
 };
 
 export default App;
