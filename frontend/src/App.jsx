@@ -6,6 +6,8 @@ import Register from './pages/Register';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import GovernmentDashboard from './pages/government/GovernmentDashboard';
 import PharmacyLocator from './components/PharmacyLocator.jsx';
+import LandingPage from './LandingPage';
+import ProfilePage from './ProfilePage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 const baseMedicineCatalog = [
@@ -2124,9 +2126,17 @@ return (
 <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>Patient Dashboard</h1>
 <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>Use the cards below to manage your care workflow.</p>
 </div>
+<div style={{ display: 'flex', gap: '10px' }}>
+<button 
+  style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }} 
+  onClick={() => navigate('/profile')}
+>
+  Profile
+</button>
 <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
 Logout
 </button>
+</div>
 </div>
 
 {/* Global Medicine Search */}
@@ -2673,30 +2683,97 @@ View Deliveries
 const SupplierDashboard = () => {
 const navigate = useNavigate();
 const { logout, user } = useAuth();
-const { supplyLedger, addShipment, updateShipmentStatus } = useSupplyChain();
 const [activePanel, setActivePanel] = useState('overview');
+const [products, setProducts] = useState([]);
+const [orders, setOrders] = useState([]);
+const [pharmacies, setPharmacies] = useState([]);
+const [analytics, setAnalytics] = useState({
+  totalProducts: 0,
+  activeOrders: 0,
+  totalRevenue: 0,
+  partnerPharmacies: 0
+});
+const [isLoading, setIsLoading] = useState(true);
 const [shipmentForm, setShipmentForm] = useState({
-pharmacyId: 'PH-001',
-medicineId: 'MED-001',
-quantity: '100',
-wholesalePrice: '80',
-markupPercent: '20',
-eta: '3 days',
+  pharmacyId: '',
+  medicineId: '',
+  quantity: '100',
+  wholesalePrice: '80',
+  markupPercent: '20',
+  eta: '3 days',
 });
 const [highlightPharmacy, setHighlightPharmacy] = useState('');
 const [highlightMedicine, setHighlightMedicine] = useState('');
 
-const inventoryDemand = baseMedicineCatalog.map((med) => ({
-id: med.id,
-label: med.name,
-demandStatus: med.availability === 'low_stock' ? 'High demand' : med.availability === 'pre_order' ? 'Pre-order' : 'Stable',
-pharmaciesCarrying: med.pharmacies.length,
+// Fetch supplier data
+const fetchSupplierData = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Fetch products, orders, analytics, and pharmacies in parallel
+    const [productsRes, ordersRes, analyticsRes, pharmaciesRes, supplierOrdersRes] = await Promise.all([
+      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier-orders/supplier-orders`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/analytics`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/users?role=pharmacy&isApproved=true`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+    ]);
+
+    const productsData = await productsRes.json();
+    const ordersData = await ordersRes.json();
+    const analyticsData = await analyticsRes.json();
+    const pharmaciesData = await pharmaciesRes.json();
+    const supplierOrdersData = await supplierOrdersRes.json();
+
+    if (productsData.success) {
+      setProducts(productsData.data);
+    }
+    
+    if (ordersData.success) {
+      setOrders(ordersData.data);
+    }
+    
+    if (analyticsData.success) {
+      setAnalytics(analyticsData.data);
+    }
+    
+    if (pharmaciesData.success) {
+      setPharmacies(pharmaciesData.data || []);
+    }
+    
+    if (supplierOrdersData.success) {
+      // Add supplier orders to the orders array for display
+      setOrders(prev => [...prev, ...supplierOrdersData.data]);
+    }
+  } catch (error) {
+    console.error('Error fetching supplier data:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchSupplierData();
+}, []);
+
+const inventoryDemand = products.map((product) => ({
+  id: product._id,
+  label: product.name,
+  demandStatus: product.stock > 10 ? 'Stable' : product.stock > 0 ? 'Low Stock' : 'Out of Stock',
+  pharmaciesCarrying: 0, // This would need to be calculated from orders
 }));
 
 const supplyStats = {
-activeShipments: supplyLedger.filter((entry) => entry.status !== 'Delivered').length,
-totalUnits: supplyLedger.reduce((sum, entry) => sum + entry.quantity, 0),
-pharmaciesServed: new Set(supplyLedger.map((entry) => entry.pharmacyId)).size,
+  activeShipments: orders.filter((order) => order.status !== 'delivered').length,
+  totalUnits: products.reduce((sum, product) => sum + (product.stock || 0), 0),
+  pharmaciesServed: analytics.partnerPharmacies,
 };
 
 const handleLogout = () => {
@@ -2718,10 +2795,12 @@ setShipmentForm((prev) => ({ ...prev, quantity: '100' }));
 setActivePanel('transactions');
 };
 
-const filteredLedger = supplyLedger.filter((entry) => {
-const pharmacyMatch = highlightPharmacy ? entry.pharmacyId === highlightPharmacy : true;
-const medicineMatch = highlightMedicine ? entry.medicineId === highlightMedicine : true;
-return pharmacyMatch && medicineMatch;
+const filteredLedger = orders.filter((order) => {
+  const pharmacyMatch = highlightPharmacy ? order.pharmacyId === highlightPharmacy : true;
+  const medicineMatch = highlightMedicine ? 
+    order.medications.some(med => med._id === highlightMedicine || med.name === products.find(p => p._id === highlightMedicine)?.name) : 
+    true;
+  return pharmacyMatch && medicineMatch;
 });
 
 const renderSupplierPanel = () => {
@@ -2746,14 +2825,14 @@ return (
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
 <h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Partner pharmacies</h4>
 <div style={{ display: 'grid', gap: '10px' }}>
-{pharmacyDirectory.map((pharmacy) => (
-<div key={pharmacy.id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+{pharmacies.map((pharmacy) => (
+<div key={pharmacy._id} style={{ border: '1px solid #edf2f7', borderRadius: '12px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 <div>
-<div style={{ fontWeight: 600 }}>{pharmacy.name}</div>
-<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{pharmacy.city} • {pharmacy.kebele}</p>
+<div style={{ fontWeight: 600 }}>{pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}</div>
+<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{pharmacy.profile?.city || 'Addis Ababa'} • {pharmacy.profile?.kebele || ''}</p>
 </div>
 <button style={{ ...buttonBaseStyle, background: '#2563eb' }} onClick={() => {
-setHighlightPharmacy(pharmacy.id);
+setHighlightPharmacy(pharmacy._id);
 setActivePanel('transactions');
 }}>
 View supply
@@ -2775,9 +2854,10 @@ value={shipmentForm.pharmacyId}
 onChange={(e) => setShipmentForm((prev) => ({ ...prev, pharmacyId: e.target.value }))}
 style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e0' }}
 >
-{pharmacyDirectory.map((pharmacy) => (
-<option key={pharmacy.id} value={pharmacy.id}>
-{pharmacy.name}
+<option value="">Select pharmacy</option>
+{pharmacies.map((pharmacy) => (
+<option key={pharmacy._id} value={pharmacy._id}>
+{pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
 </option>
 ))}
 </select>
@@ -2786,9 +2866,10 @@ value={shipmentForm.medicineId}
 onChange={(e) => setShipmentForm((prev) => ({ ...prev, medicineId: e.target.value }))}
 style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e0' }}
 >
-{baseMedicineCatalog.map((med) => (
-<option key={med.id} value={med.id}>
-{med.name}
+<option value="">Select medicine</option>
+{products.map((product) => (
+<option key={product._id} value={product._id}>
+{product.name}
 </option>
 ))}
 </select>
@@ -2832,9 +2913,9 @@ onChange={(e) => setHighlightPharmacy(e.target.value)}
 style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e0' }}
 >
 <option value="">All pharmacies</option>
-{pharmacyDirectory.map((pharmacy) => (
-<option key={pharmacy.id} value={pharmacy.id}>
-{pharmacy.name}
+{pharmacies.map((pharmacy) => (
+<option key={pharmacy._id} value={pharmacy._id}>
+{pharmacy.pharmacyName || `${pharmacy.profile?.firstName}'s Pharmacy`}
 </option>
 ))}
 </select>
@@ -2844,48 +2925,60 @@ onChange={(e) => setHighlightMedicine(e.target.value)}
 style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e0' }}
 >
 <option value="">All medicines</option>
-{baseMedicineCatalog.map((med) => (
-<option key={med.id} value={med.id}>
-{med.name}
+{products.map((product) => (
+<option key={product._id} value={product._id}>
+{product.name}
 </option>
 ))}
 </select>
 </div>
 <div style={{ display: 'grid', gap: '12px' }}>
-{filteredLedger.map((entry) => (
-<div key={entry.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+{filteredLedger.map((order) => (
+<div key={order._id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 <div>
-<strong style={{ color: '#2d3748' }}>{entry.medicineName}</strong>
-<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>{entry.pharmacyName} • Qty {entry.quantity}</p>
+<strong style={{ color: '#2d3748' }}>
+  {order.medications ? order.medications.map(med => med.name).join(', ') : 
+   order.medicines ? order.medicines.map(med => med.name || med).join(', ') : 
+   'Order Items'}
+</strong>
+<p style={{ margin: 0, fontSize: '12px', color: '#4a5568' }}>
+  {order.pharmacyId?.pharmacyName || order.pharmacyName || 
+   (order.pharmacyId && typeof order.pharmacyId === 'object' ? order.pharmacyId.pharmacyName : 'Pharmacy')} • 
+  Qty {order.medications ? order.medications.reduce((sum, med) => sum + med.quantity, 0) :
+        order.medicines ? order.medicines.reduce((sum, med) => sum + (med.quantity || 1), 0) : 0}
+</p>
+{order.supplierId && (
+  <p style={{ margin: 0, fontSize: '12px', color: '#718096' }}>
+    Supplier Order from {order.pharmacyId?.pharmacyName || 'Pharmacy'}
+  </p>
+)}
 </div>
-<span style={{ fontSize: '12px', fontWeight: 600, color: entry.status === 'Delivered' ? '#2f855a' : '#b7791f' }}>
-{entry.status}
+<span style={{ fontSize: '12px', fontWeight: 600, color: order.status === 'delivered' ? '#2f855a' : '#b7791f' }}>
+  {order.status || 'Pending'}
 </span>
 </div>
 <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#718096' }}>
-Wholesale {entry.wholesalePrice} birr • Markup {entry.markupPercent}% • Patient price ≈{' '}
-{Math.round(entry.wholesalePrice * (1 + entry.markupPercent / 100))} birr
+  Total: {order.totalAmount || 0} ETB • 
+  Order Date: {new Date(order.createdAt || order.orderDate).toLocaleDateString()}
 </p>
-{entry.status !== 'Delivered' && (
+{order.status !== 'delivered' && (
 <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
 <button
-style={{ ...buttonBaseStyle, background: '#2563eb' }}
-onClick={() => updateShipmentStatus(entry.id, 'Delivered')}
+  style={{ ...buttonBaseStyle, background: '#2563eb' }}
+  onClick={() => {
+    // Update order status to delivered
+    // This would need an API call to update the order
+    console.log('Mark order as delivered:', order._id);
+  }}
 >
-Mark delivered
-</button>
-<button
-style={{ ...buttonBaseStyle, background: '#4a5568' }}
-onClick={() => updateShipmentStatus(entry.id, 'Delayed')}
->
-Flag delay
+  Mark delivered
 </button>
 </div>
 )}
 </div>
 ))}
-{filteredLedger.length === 0 && <p style={{ margin: 0, color: '#a0aec0' }}>No shipments match the filters.</p>}
+{filteredLedger.length === 0 && <p style={{ margin: 0, color: '#a0aec0' }}>No orders match the filters.</p>}
 </div>
 </div>
 </div>
@@ -2903,9 +2996,17 @@ return (
 <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#2d3748', marginBottom: '6px' }}>Supplier Dashboard</h1>
 <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>Plan shipments, track deliveries, and influence retail prices.</p>
 </div>
+<div style={{ display: 'flex', gap: '10px' }}>
+<button 
+  style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }} 
+  onClick={() => navigate('/profile')}
+>
+  Profile
+</button>
 <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
 Logout
 </button>
+</div>
 </div>
 
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -3573,9 +3674,17 @@ return (
 {activePharmacy?.name ? `Managing ${activePharmacy.name}${activePharmacy.city ? ` • ${activePharmacy.city}` : ''}` : 'Control inventory, shortages, and community feedback.'}
 </p>
 </div>
+<div style={{ display: 'flex', gap: '10px' }}>
+<button 
+  style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }} 
+  onClick={() => navigate('/profile')}
+>
+  Profile
+</button>
 <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
 Logout
 </button>
+</div>
 </div>
 
 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -3912,15 +4021,19 @@ const DriverDashboard = () => {
   const fetchDeliveries = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-deliveries`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
       const data = await response.json();
-      if (data.success) {
-        setDeliveries(data.data || []);
+      if (data.deliveryRequests) {
+        // Filter deliveries assigned to this delivery person
+        const myDeliveries = data.deliveryRequests.filter(delivery => 
+          delivery.dispatcher && delivery.dispatcher._id === driverProfile?._id
+        );
+        setDeliveries(myDeliveries);
       }
     } catch (error) {
       console.error('Error fetching deliveries:', error);
@@ -3954,8 +4067,8 @@ const DriverDashboard = () => {
   const updateDeliveryStatus = async (deliveryId, status) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/update-delivery/${deliveryId}`, {
-        method: 'PUT',
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/${deliveryId}/status`, {
+        method: 'PATCH',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
@@ -3963,7 +4076,7 @@ const DriverDashboard = () => {
         body: JSON.stringify({ status })
       });
       const data = await response.json();
-      if (data.success) {
+      if (data.deliveryRequest) {
         fetchDeliveries(); // Refresh deliveries
         alert('Delivery status updated successfully!');
       }
@@ -3975,8 +4088,13 @@ const DriverDashboard = () => {
 
   useEffect(() => {
     fetchDriverProfile();
-    fetchDeliveries();
   }, []);
+
+  useEffect(() => {
+    if (driverProfile) {
+      fetchDeliveries();
+    }
+  }, [driverProfile]);
 
   const handleLogout = () => {
     logout();
@@ -3998,34 +4116,36 @@ const DriverDashboard = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                       <div>
                         <div style={{ fontWeight: 600, color: '#2d3748' }}>
-                          Order #{delivery.orderId?._id?.slice(-8) || 'N/A'}
+                          Delivery #{delivery.trackingCode || delivery._id?.slice(-8) || 'N/A'}
                         </div>
                         <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
-                          {delivery.orderId?.medications?.map(med => med.name).join(', ') || 'Medications'}
+                          {delivery.items?.map(item => item.drug?.name || item.drug).join(', ') || 'Medications'}
                         </p>
                         <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
-                          Customer: {delivery.orderId?.deliveryAddress?.street}, {delivery.orderId?.deliveryAddress?.city}
+                          Customer: {delivery.deliveryAddress?.street}, {delivery.deliveryAddress?.city}
                         </p>
                         <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
-                          Total: ${delivery.orderId?.totalAmount || 0}
+                          Total: ${delivery.totalAmount || 0}
+                        </p>
+                        <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+                          Pharmacy: {delivery.pharmacy?.name || 'Pharmacy'}
                         </p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ 
                           fontSize: '12px', 
                           color: delivery.status === 'delivered' ? '#059669' : 
-                                 delivery.status === 'in_transit' ? '#f59e0b' :
-                                 delivery.status === 'picked_up' ? '#3b82f6' : '#6b7280',
+                                 delivery.status === 'on-the-way' ? '#f59e0b' :
+                                 delivery.status === 'assigned' ? '#3b82f6' : '#6b7280',
                           fontWeight: '600',
                           padding: '4px 8px',
                           borderRadius: '6px',
                           backgroundColor: delivery.status === 'delivered' ? '#d1fae5' :
-                                          delivery.status === 'in_transit' ? '#fef3c7' :
-                                          delivery.status === 'picked_up' ? '#dbeafe' : '#f3f4f1',
+                                          delivery.status === 'on-the-way' ? '#fef3c7' :
+                                          delivery.status === 'assigned' ? '#dbeafe' : '#f3f4f1',
                         }}>
                           {delivery.status === 'assigned' ? 'Assigned' :
-                           delivery.status === 'picked_up' ? 'Picked Up' :
-                           delivery.status === 'in_transit' ? 'In Transit' :
+                           delivery.status === 'on-the-way' ? 'On The Way' :
                            delivery.status === 'delivered' ? 'Delivered' : delivery.status}
                         </div>
                         {delivery.status !== 'delivered' && (
@@ -4043,12 +4163,10 @@ const DriverDashboard = () => {
                               width: '100%'
                             }}
                             onClick={() => updateDeliveryStatus(delivery._id, 
-                              delivery.status === 'assigned' ? 'picked_up' :
-                              delivery.status === 'picked_up' ? 'in_transit' : 'delivered'
+                              delivery.status === 'assigned' ? 'on-the-way' : 'delivered'
                             )}
                           >
-                            {delivery.status === 'assigned' ? 'Mark Picked Up' :
-                             delivery.status === 'picked_up' ? 'Mark In Transit' : 'Mark Delivered'}
+                            {delivery.status === 'assigned' ? 'Mark On The Way' : 'Mark Delivered'}
                           </button>
                         )}
                       </div>
@@ -4189,9 +4307,17 @@ const DriverDashboard = () => {
               Manage your deliveries and availability
             </p>
           </div>
-          <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }} 
+              onClick={() => navigate('/profile')}
+            >
+              Profile
+            </button>
+            <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
@@ -4765,9 +4891,17 @@ const DispatcherDashboard = () => {
               Coordinate deliveries and track shipments
             </p>
           </div>
-          <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }} 
+              onClick={() => navigate('/profile')}
+            >
+              Profile
+            </button>
+            <button style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }} onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Analytics Cards */}
@@ -5284,15 +5418,23 @@ const DeliveryDashboard = () => {
               Manage your deliveries and track your performance
             </p>
           </div>
-          <button 
-            onClick={() => {
-              localStorage.removeItem('token');
-              window.location.href = '/login';
-            }}
-            style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              style={{ ...buttonBaseStyle, background: '#3182ce', padding: '10px 18px' }}
+              onClick={() => navigate('/profile')}
+            >
+              Profile
+            </button>
+            <button 
+              onClick={() => {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+              }}
+              style={{ ...buttonBaseStyle, background: '#1f2937', padding: '10px 18px' }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Analytics Cards */}
@@ -5470,7 +5612,7 @@ v7_startTransition: true,
 v7_relativeSplatPath: true
 }}>
 <Routes>
-<Route path="/" element={<Landing />} />
+<Route path="/" element={<LandingPage />} />
 <Route
 path="/login"
 element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
@@ -5478,6 +5620,10 @@ element={!user ? <Login /> : <Navigate to="/dashboard" replace />}
 <Route
 path="/register"
 element={!user ? <Register /> : <Navigate to="/dashboard" replace />}
+/>
+<Route
+path="/profile"
+element={user ? <ProfilePage /> : <Navigate to="/login" replace />}
 />
 <Route
 path="/dashboard/*"
