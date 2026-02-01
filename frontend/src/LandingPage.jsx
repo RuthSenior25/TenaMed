@@ -36,8 +36,7 @@ const LandingPage = () => {
               <Link to="/" style={{ 
                 color: '#4a5568', 
                 textDecoration: 'none',
-                fontWeight: '500',
-                '&:hover': { color: '#3182ce' }
+                fontWeight: '500'
               }}>
                 Home
               </Link>

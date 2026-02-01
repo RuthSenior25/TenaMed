@@ -41,8 +41,98 @@ const ProfilePage = () => {
     }
   }, [user]);
 
+  const validateInput = (name, value) => {
+    // Sanitize input to prevent XSS
+    const sanitizeInput = (input) => {
+      return input
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .trim();
+    };
+
+    // Validation rules
+    const validationRules = {
+      firstName: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length < 2) return 'First name must be at least 2 characters';
+        if (sanitized.length > 50) return 'First name must be less than 50 characters';
+        if (!/^[a-zA-Z\s]+$/.test(sanitized)) return 'First name can only contain letters and spaces';
+        return null;
+      },
+      lastName: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length < 2) return 'Last name must be at least 2 characters';
+        if (sanitized.length > 50) return 'Last name must be less than 50 characters';
+        if (!/^[a-zA-Z\s]+$/.test(sanitized)) return 'Last name can only contain letters and spaces';
+        return null;
+      },
+      email: (val) => {
+        const sanitized = sanitizeInput(val);
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(sanitized)) return 'Please enter a valid email address';
+        return null;
+      },
+      phone: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized && !/^[\d\s\-\+\(\)]+$/.test(sanitized)) {
+          return 'Phone number can only contain digits, spaces, and common phone symbols';
+        }
+        return null;
+      },
+      pharmacyName: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length < 2) return 'Pharmacy name must be at least 2 characters';
+        if (sanitized.length > 100) return 'Pharmacy name must be less than 100 characters';
+        return null;
+      },
+      licenseNumber: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized && !/^[a-zA-Z0-9\s\-]+$/.test(sanitized)) {
+          return 'License number can only contain letters, numbers, spaces, and hyphens';
+        }
+        return null;
+      },
+      company: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length < 2) return 'Company name must be at least 2 characters';
+        if (sanitized.length > 100) return 'Company name must be less than 100 characters';
+        return null;
+      },
+      vehicleType: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length < 2) return 'Vehicle type must be at least 2 characters';
+        if (sanitized.length > 50) return 'Vehicle type must be less than 50 characters';
+        return null;
+      },
+      licensePlate: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized && !/^[a-zA-Z0-9\s\-]+$/.test(sanitized)) {
+          return 'License plate can only contain letters, numbers, spaces, and hyphens';
+        }
+        return null;
+      },
+      bio: (val) => {
+        const sanitized = sanitizeInput(val);
+        if (sanitized.length > 500) return 'Bio must be less than 500 characters';
+        return null;
+      }
+    };
+
+    return validationRules[name] ? validationRules[name](value) : null;
+  };
+
+  const [errors, setErrors] = useState({});
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validate input and set errors
+    const error = validateInput(name, value);
+    setErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+    
     setProfileData(prev => ({
       ...prev,
       [name]: value
@@ -51,6 +141,52 @@ const ProfilePage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate all fields before submission
+    const newErrors = {};
+    Object.keys(profileData).forEach(key => {
+      if (profileData[key]) {
+        const error = validateInput(key, profileData[key]);
+        if (error) {
+          newErrors[key] = error;
+        }
+      }
+    });
+    
+    // Check for required fields based on user role
+    if (user?.role === 'pharmacy') {
+      if (!profileData.pharmacyName) {
+        newErrors.pharmacyName = 'Pharmacy name is required';
+      }
+      if (!profileData.licenseNumber) {
+        newErrors.licenseNumber = 'License number is required';
+      }
+    }
+    
+    if (user?.role === 'supplier' && !profileData.company) {
+      newErrors.company = 'Company name is required';
+    }
+    
+    if (user?.role === 'delivery_person') {
+      if (!profileData.vehicleType) {
+        newErrors.vehicleType = 'Vehicle type is required';
+      }
+      if (!profileData.licensePlate) {
+        newErrors.licensePlate = 'License plate is required';
+      }
+    }
+    
+    // Always require first name, last name, and email
+    if (!profileData.firstName) newErrors.firstName = 'First name is required';
+    if (!profileData.lastName) newErrors.lastName = 'Last name is required';
+    if (!profileData.email) newErrors.email = 'Email is required';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      alert('Please fix the errors before submitting.');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -83,6 +219,7 @@ const ProfilePage = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
+    setErrors({}); // Clear all errors
     // Reset to original data
     if (user) {
       setProfileData({
@@ -103,6 +240,7 @@ const ProfilePage = () => {
 
   const renderField = (name, label, type = 'text', required = false) => {
     const value = profileData[name];
+    const error = errors[name];
     const showField = value !== undefined && value !== null;
     
     if (!showField && !isEditing) return null;
@@ -118,20 +256,33 @@ const ProfilePage = () => {
           {label} {required && <span style={{ color: '#e53e3e' }}>*</span>}
         </label>
         {isEditing ? (
-          <input
-            type={type}
-            name={name}
-            value={value || ''}
-            onChange={handleInputChange}
-            required={required}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #cbd5e0',
-              borderRadius: '0.375rem',
-              fontSize: '1rem'
-            }}
-          />
+          <div>
+            <input
+              type={type}
+              name={name}
+              value={value || ''}
+              onChange={handleInputChange}
+              required={required}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: error ? '1px solid #e53e3e' : '1px solid #cbd5e0',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                backgroundColor: error ? '#fff5f5' : 'white'
+              }}
+            />
+            {error && (
+              <div style={{
+                color: '#e53e3e',
+                fontSize: '0.875rem',
+                marginTop: '0.25rem',
+                fontWeight: '500'
+              }}>
+                {error}
+              </div>
+            )}
+          </div>
         ) : (
           <div style={{
             padding: '0.75rem',

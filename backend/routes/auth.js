@@ -656,4 +656,89 @@ router.put('/update-availability', authenticate, checkRole(['delivery_person']),
   }
 });
 
+// Update user profile
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const updateData = req.body;
+    
+    console.log('Profile update request for user:', userId);
+    console.log('Update data:', updateData);
+
+    // Validate update data
+    const allowedFields = [
+      'firstName', 'lastName', 'phone', 'address', 'bio',
+      'pharmacyName', 'licenseNumber', 'company', 'vehicleType', 'licensePlate'
+    ];
+    
+    const filteredData = {};
+    Object.keys(updateData).forEach(key => {
+      if (allowedFields.includes(key) && updateData[key] !== undefined) {
+        filteredData[key] = updateData[key];
+      }
+    });
+
+    // Update user profile
+    const updateQuery = {};
+    
+    // Handle profile nested fields
+    if (filteredData.firstName || filteredData.lastName || filteredData.phone || filteredData.address || filteredData.bio) {
+      updateQuery['profile.firstName'] = filteredData.firstName;
+      updateQuery['profile.lastName'] = filteredData.lastName;
+      updateQuery['profile.phone'] = filteredData.phone;
+      updateQuery['profile.address'] = filteredData.address;
+      updateQuery['profile.bio'] = filteredData.bio;
+    }
+    
+    // Handle role-specific fields
+    if (filteredData.pharmacyName) updateQuery.pharmacyName = filteredData.pharmacyName;
+    if (filteredData.licenseNumber) updateQuery.licenseNumber = filteredData.licenseNumber;
+    if (filteredData.company) updateQuery['profile.company'] = filteredData.company;
+    if (filteredData.vehicleType) updateQuery['profile.vehicleType'] = filteredData.vehicleType;
+    if (filteredData.licensePlate) updateQuery['profile.licensePlate'] = filteredData.licensePlate;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateQuery },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log('Profile updated successfully for user:', userId);
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => ({
+        field: val.path,
+        message: val.message
+      }));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: messages
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

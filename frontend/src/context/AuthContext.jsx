@@ -3,26 +3,6 @@ import { authAPI } from '../api/auth';
 import api from '../api/axiosConfig';
 import toast from 'react-hot-toast';
 
-// Hardcoded credentials
-const ADMIN_CREDENTIALS = {
-  email: 'admin@tenamed.com',
-  password: 'TenaMed2024!',
-  role: 'admin',
-  firstName: 'Admin',
-  lastName: 'User',
-  id: 'admin-001'
-};
-
-// Hardcoded government credentials
-const GOVERNMENT_CREDENTIALS = {
-  email: 'Government@gmail.com',
-  password: 'TenaMed1',
-  role: 'government',
-  firstName: 'Government',
-  lastName: 'Official',
-  id: 'gov-001'
-};
-
 const AuthContext = createContext();
 
 const initialState = {

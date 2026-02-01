@@ -805,17 +805,21 @@ useEffect(() => {
   // fetchPrescriptions(); // Removed - endpoint doesn't exist
   fetchOrders();
   fetchDeliveries();
-}, []); // Only run on mount, not when location changes
+}, []); // Only run on mount
 
-// Separate useEffect to handle location-based updates
+// Single useEffect to handle location-based updates with proper dependency management
 useEffect(() => {
   if (userLocation) {
-    // Re-fetch pharmacies when location changes to update distances
-    fetchApprovedPharmacies();
+    // Debounce the pharmacy fetch to avoid multiple rapid calls
+    const timeoutId = setTimeout(() => {
+      fetchApprovedPharmacies();
+    }, 500); // 500ms delay
+    
+    return () => clearTimeout(timeoutId); // Cleanup on unmount or location change
   }
-}, [userLocation]);
+}, [userLocation]); // Only depend on userLocation
 
-// Sort pharmacies by distance when location is available
+// Sort pharmacies by distance when location is available - optimized to avoid unnecessary re-renders
 useEffect(() => {
   if (userLocation && approvedPharmacies.length > 0) {
     const sortedPharmacies = [...approvedPharmacies].sort((a, b) => {
@@ -850,7 +854,7 @@ useEffect(() => {
     
     setApprovedPharmacies(sortedPharmacies);
   }
-}, [userLocation, approvedPharmacies.length]);
+}, [userLocation]); // Remove approvedPharmacies.length from dependencies to prevent infinite loops
 
 // Global medicine search function
 const searchGlobalMedicines = async (medicineName) => {
