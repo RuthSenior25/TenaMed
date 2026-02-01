@@ -261,19 +261,19 @@ const HomePage = () => {
           }}>
             <div>
               <h3 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#3182ce', margin: 0 }}>
-                500+
+                50+
               </h3>
               <p style={{ color: '#718096', fontSize: '1.1rem' }}>Active Pharmacies</p>
             </div>
             <div>
               <h3 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#48bb78', margin: 0 }}>
-                50+
+                15+
               </h3>
               <p style={{ color: '#718096', fontSize: '1.1rem' }}>Verified Suppliers</p>
             </div>
             <div>
               <h3 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#ed8936', margin: 0 }}>
-                10K+
+                500+
               </h3>
               <p style={{ color: '#718096', fontSize: '1.1rem' }}>Monthly Orders</p>
             </div>
