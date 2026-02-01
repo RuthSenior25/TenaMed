@@ -104,8 +104,8 @@ const HomePage = () => {
     <div>
       {/* Hero Section */}
       <section style={{ 
-        backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
+        backgroundColor: 'linear-gradient(135deg, #4299e1 0%, #48bb78 100%)',
+        color: '#1a202c',
         padding: '4rem 2rem',
         textAlign: 'center'
       }}>
@@ -115,15 +115,16 @@ const HomePage = () => {
             fontWeight: 'bold', 
             marginBottom: '1rem',
             lineHeight: '1.2',
-            color: '#ffffff'
+            color: '#1a202c',
+            textShadow: '2px 2px 4px rgba(255,255,255,0.5)'
           }}>
             Welcome to TenaMed
           </h1>
           <p style={{ 
             fontSize: '1.25rem', 
             marginBottom: '2rem',
-            opacity: 0.9,
-            color: '#f7fafc'
+            color: '#2d3748',
+            textShadow: '1px 1px 2px rgba(255,255,255,0.5)'
           }}>
             Your trusted pharmaceutical supply chain management platform. Connecting pharmacies, 
             suppliers, and patients for seamless healthcare delivery in Ethiopia.
@@ -132,14 +133,14 @@ const HomePage = () => {
             <Link 
               to="/register" 
               style={{ 
-                backgroundColor: '#ffffff',
-                color: '#667eea',
+                backgroundColor: '#1a202c',
+                color: '#ffffff',
                 padding: '1rem 2rem',
                 borderRadius: '0.5rem',
                 textDecoration: 'none',
                 fontWeight: 'bold',
                 fontSize: '1.1rem',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
                 transition: 'all 0.3s ease'
               }}
             >
@@ -149,13 +150,13 @@ const HomePage = () => {
               to="/login" 
               style={{ 
                 backgroundColor: 'transparent',
-                color: '#ffffff',
+                color: '#1a202c',
                 padding: '1rem 2rem',
                 borderRadius: '0.5rem',
                 textDecoration: 'none',
                 fontWeight: 'bold',
                 fontSize: '1.1rem',
-                border: '2px solid #ffffff',
+                border: '2px solid #1a202c',
                 transition: 'all 0.3s ease'
               }}
             >
