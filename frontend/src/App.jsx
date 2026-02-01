@@ -713,37 +713,38 @@ const fetchOrders = async () => {
 const fetchDeliveries = async () => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/orders/my-orders`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
       }
     });
     const data = await response.json();
-    if (data.success) {
-      // Convert orders to delivery format for display
-      const deliveryData = (data.data || []).map(order => ({
-        id: order._id,
-        medication: order.medications ? order.medications.map(med => med.name).join(', ') : 'Order',
-        quantity: order.medications ? order.medications.reduce((sum, med) => sum + med.quantity, 0) : 1,
-        courier: order.delivery?.driverId ? order.delivery.driverId.profile?.firstName + ' ' + order.delivery.driverId.profile?.lastName : 
-                 order.assignedDriver ? order.assignedDriver.profile?.firstName + ' ' + order.assignedDriver.profile?.lastName : 'Pending Assignment',
-        eta: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'in_transit' ? 'Out for delivery' : 
-               order.deliveryStatus === 'picked_up' ? 'Picked up' :
-               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
-        status: order.deliveryStatus === 'delivered' ? 'Delivered' : 
-               order.deliveryStatus === 'in_transit' ? 'Out for delivery' : 
-               order.deliveryStatus === 'picked_up' ? 'Picked up' :
-               order.deliveryStatus === 'assigned' ? 'Preparing' : 'Pending',
-        createdAt: order.createdAt,
-        pharmacy: order.pharmacyId?.pharmacyName || 'Unknown Pharmacy',
-        deliveryStatus: order.deliveryStatus
+    if (data.deliveryRequests) {
+      // Convert delivery requests to delivery format for display
+      const deliveryData = (data.deliveryRequests || []).map(delivery => ({
+        id: delivery._id,
+        medication: delivery.items ? delivery.items.map(item => item.drug?.name || 'Medicine').join(', ') : 'Order',
+        quantity: delivery.items ? delivery.items.reduce((sum, item) => sum + item.quantity, 0) : 1,
+        courier: delivery.dispatcher ? delivery.dispatcher.profile?.firstName + ' ' + delivery.dispatcher.profile?.lastName : 'Pending Assignment',
+        eta: delivery.status === 'delivered' ? 'Delivered' : 
+               delivery.status === 'in_transit' ? 'Out for delivery' : 
+               delivery.status === 'picked_up' ? 'Picked up' :
+               delivery.status === 'assigned' ? 'Preparing' : 'Pending',
+        status: delivery.status === 'delivered' ? 'Delivered' : 
+               delivery.status === 'in_transit' ? 'Out for delivery' : 
+               delivery.status === 'picked_up' ? 'Picked up' :
+               delivery.status === 'assigned' ? 'Preparing' : 'Pending',
+        createdAt: delivery.createdAt,
+        pharmacy: delivery.pharmacy?.name || 'Unknown Pharmacy',
+        deliveryStatus: delivery.status,
+        trackingCode: delivery.trackingCode
       }));
       setDeliveries(deliveryData);
     }
   } catch (error) {
     console.error('Error fetching deliveries:', error);
+    setDeliveries([]);
   }
 };
 
