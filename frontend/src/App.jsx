@@ -5944,5 +5944,4 @@ background: '#ff4d4f',
 </AuthProvider>
 );
 };
-}
 export default App;
