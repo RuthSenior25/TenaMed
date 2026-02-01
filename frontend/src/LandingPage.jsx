@@ -25,7 +25,7 @@ const LandingPage = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
             <h1 style={{ 
-              color: '#2d3748', 
+              color: '#2b6cb0', 
               fontSize: '1.5rem', 
               fontWeight: 'bold',
               margin: 0 
@@ -34,23 +34,23 @@ const LandingPage = () => {
             </h1>
             <div style={{ display: 'flex', gap: '1.5rem' }}>
               <Link to="/" style={{ 
-                color: '#4a5568', 
+                color: '#2d3748', 
                 textDecoration: 'none',
-                fontWeight: '500'
+                fontWeight: '600'
               }}>
                 Home
               </Link>
               <Link to="/about" style={{ 
-                color: '#4a5568', 
+                color: '#2d3748', 
                 textDecoration: 'none',
-                fontWeight: '500'
+                fontWeight: '600'
               }}>
                 About Us
               </Link>
               <Link to="/contact" style={{ 
-                color: '#4a5568', 
+                color: '#2d3748', 
                 textDecoration: 'none',
-                fontWeight: '500'
+                fontWeight: '600'
               }}>
                 Contact Us
               </Link>
@@ -114,14 +114,16 @@ const HomePage = () => {
             fontSize: '3rem', 
             fontWeight: 'bold', 
             marginBottom: '1rem',
-            lineHeight: '1.2'
+            lineHeight: '1.2',
+            color: '#ffffff'
           }}>
             Welcome to TenaMed
           </h1>
           <p style={{ 
             fontSize: '1.25rem', 
             marginBottom: '2rem',
-            opacity: 0.9
+            opacity: 0.9,
+            color: '#f7fafc'
           }}>
             Your trusted pharmaceutical supply chain management platform. Connecting pharmacies, 
             suppliers, and patients for seamless healthcare delivery in Ethiopia.
@@ -130,31 +132,34 @@ const HomePage = () => {
             <Link 
               to="/register" 
               style={{ 
-                backgroundColor: 'white',
+                backgroundColor: '#ffffff',
                 color: '#667eea',
                 padding: '1rem 2rem',
                 borderRadius: '0.5rem',
                 textDecoration: 'none',
                 fontWeight: 'bold',
-                fontSize: '1.1rem'
+                fontSize: '1.1rem',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                transition: 'all 0.3s ease'
               }}
             >
               Get Started
             </Link>
             <Link 
-              to="/about" 
+              to="/login" 
               style={{ 
                 backgroundColor: 'transparent',
-                color: 'white',
-                border: '2px solid white',
+                color: '#ffffff',
                 padding: '1rem 2rem',
                 borderRadius: '0.5rem',
                 textDecoration: 'none',
                 fontWeight: 'bold',
-                fontSize: '1.1rem'
+                fontSize: '1.1rem',
+                border: '2px solid #ffffff',
+                transition: 'all 0.3s ease'
               }}
             >
-              Learn More
+              Login
             </Link>
           </div>
         </div>
