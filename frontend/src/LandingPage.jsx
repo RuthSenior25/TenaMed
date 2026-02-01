@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from './context/AuthContext';
 
 const LandingPage = () => {
   const { user } = useAuth();
