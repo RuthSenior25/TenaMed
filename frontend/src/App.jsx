@@ -5937,11 +5937,12 @@ style: {
 background: '#ff4d4f',
 },
 },
-}}
-/>
-<AppContent />
-</SupplyChainProvider>
-</AuthProvider>
-);
+          }}
+        />
+        <AppContent />
+      </SupplyChainProvider>
+    </AuthProvider>
+  );
 };
+
 export default App;
