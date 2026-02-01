@@ -5945,5 +5945,4 @@ background: '#ff4d4f',
   );
 };
 
-// Fixed export statement
 export default App;
