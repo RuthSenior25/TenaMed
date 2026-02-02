@@ -5306,7 +5306,7 @@ const DeliveryDashboard = () => {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: 'assigned' })
+        body: JSON.stringify({ status: 'picked_up' })
       });
       const data = await response.json();
       if (data.success) {

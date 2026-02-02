@@ -156,7 +156,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Get driver's assigned deliveries
-router.get('/my-assignments', authenticate, authorize('delivery_person'), async (req, res) => {
+router.get('/my-assignments', authenticate, authorize('user'), async (req, res) => {
   try {
     const { page = 1, limit = 20, status } = req.query;
 
@@ -197,13 +197,13 @@ router.get('/my-assignments', authenticate, authorize('delivery_person'), async 
 });
 
 // Update delivery status (driver only)
-router.put('/:id/status', authenticate, authorize('delivery_person'), async (req, res) => {
+router.put('/:id/status', authenticate, authorize('user'), async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
     // Validate status
-    const validStatuses = ['assigned', 'picked_up', 'in_transit', 'delivered'];
+    const validStatuses = ['picked_up', 'in_transit', 'delivered'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
