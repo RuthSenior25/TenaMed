@@ -483,8 +483,7 @@ const [locationFilter, setLocationFilter] = useState({
   city: '',
   radius: 10
 });
-// Prescriptions functionality removed - endpoint doesn't exist
-// const [prescriptions, setPrescriptions] = useState([]);
+const [prescriptions, setPrescriptions] = useState([]);
 const [orders, setOrders] = useState([]);
 const [deliveries, setDeliveries] = useState([]);
 const [alerts, setAlerts] = useState([]);
@@ -803,7 +802,7 @@ const fetchApprovedPharmacies = async () => {
 useEffect(() => {
   fetchApprovedPharmacies();
   fetchPatientProfile();
-  // fetchPrescriptions(); // Removed - endpoint doesn't exist
+  fetchPrescriptions();
   fetchOrders();
   fetchDeliveries();
 }, []); // Only run on mount
@@ -2092,6 +2091,150 @@ Reorder
 ))}
 </div>
 )}
+</div>
+</div>
+);
+case 'prescriptions':
+return (
+<div style={{ display: 'grid', gap: '18px' }}>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>My Prescriptions</h4>
+<div style={{ display: 'grid', gap: '12px' }}>
+{[
+{ id: 'RX001', drug: 'Amoxicillin 500mg', dosage: '1 tablet twice daily', frequency: 'Every 12 hours', refills: 2, pharmacy: 'Bole City Pharmacy', doctor: 'Dr. Alemu', lastRefill: '2024-01-15', expires: '2024-03-15' },
+{ id: 'RX002', drug: 'Metformin 850mg', dosage: '1 tablet daily', frequency: 'Every morning', refills: 1, pharmacy: 'CMC Community Pharmacy', doctor: 'Dr. Tesfaye', lastRefill: '2024-01-20', expires: '2024-04-20' },
+{ id: 'RX003', drug: 'Lisinopril 10mg', dosage: '1 tablet daily', frequency: 'Every morning', refills: 3, pharmacy: 'Lafto Prime Pharmacy', doctor: 'Dr. Bekele', lastRefill: '2024-01-10', expires: '2024-04-10' }
+].map((prescription) => (
+<div key={prescription.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+<div>
+<div style={{ fontWeight: 600, color: '#2d3748', marginBottom: '4px' }}>
+{prescription.drug} <span style={{ fontSize: '12px', color: '#718096' }}>#{prescription.id}</span>
+</div>
+<p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+<strong>Dosage:</strong> {prescription.dosage}
+</p>
+<p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+<strong>Frequency:</strong> {prescription.frequency}
+</p>
+<p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+<strong>Doctor:</strong> {prescription.doctor}
+</p>
+<p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
+<strong>Pharmacy:</strong> {prescription.pharmacy}
+</p>
+<p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
+<strong>Refills remaining:</strong> {prescription.refills} | <strong>Expires:</strong> {prescription.expires}
+</p>
+</div>
+<div style={{ textAlign: 'right' }}>
+<span style={{
+padding: '6px 12px',
+borderRadius: '999px',
+background: prescription.refills > 0 ? '#c6f6d5' : '#fed7d7',
+color: prescription.refills > 0 ? '#22543d' : '#742a2a',
+fontSize: '12px',
+fontWeight: 600,
+}}>
+{prescription.refills > 0 ? `${prescription.refills} Refills` : 'No Refills'}
+</span>
+</div>
+</div>
+<div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+{prescription.refills > 0 && (
+<button
+onClick={() => {
+setSelectedPharmacy(approvedPharmacies.find(p => p.pharmacyName === prescription.pharmacy));
+setOrderForm({
+medications: [{ name: prescription.drug, quantity: 30, instructions: prescription.dosage }],
+deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
+deliveryDate: '',
+notes: `Refill for prescription ${prescription.id} - ${prescription.drug}`
+});
+setShowOrderModal(true);
+}}
+style={{
+padding: '8px 16px',
+backgroundColor: '#3b82f6',
+color: 'white',
+border: 'none',
+borderRadius: '6px',
+cursor: 'pointer',
+fontSize: '14px',
+fontWeight: '500'
+}}
+>
+Request Refill
+</button>
+)}
+<button
+onClick={() => {
+setActivePanel('pharmacies');
+}}
+style={{
+padding: '8px 16px',
+backgroundColor: '#10b981',
+color: 'white',
+border: 'none',
+borderRadius: '6px',
+cursor: 'pointer',
+fontSize: '14px',
+fontWeight: '500'
+}}
+>
+Change Pharmacy
+</button>
+</div>
+</div>
+))}
+</div>
+</div>
+<div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+<h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>Add New Prescription</h4>
+<form onSubmit={handlePrescriptionSubmit} style={{ display: 'grid', gap: '12px' }}>
+<input
+type="text"
+placeholder="Medication name"
+value={prescriptionForm.drug}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, drug: e.target.value }))}
+style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+/>
+<input
+type="text"
+placeholder="Dosage (e.g., 1 tablet twice daily)"
+value={prescriptionForm.dosage}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, dosage: e.target.value }))}
+style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+/>
+<input
+type="text"
+placeholder="Frequency (e.g., Every 12 hours)"
+value={prescriptionForm.frequency}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, frequency: e.target.value }))}
+style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+/>
+<textarea
+placeholder="Notes (optional)"
+value={prescriptionForm.notes}
+onChange={(e) => setPrescriptionForm(prev => ({ ...prev, notes: e.target.value }))}
+style={{ padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e0', resize: 'vertical', minHeight: '80px' }}
+/>
+<button
+type="submit"
+style={{
+padding: '12px 24px',
+backgroundColor: '#4299e1',
+color: 'white',
+border: 'none',
+borderRadius: '8px',
+cursor: 'pointer',
+fontSize: '16px',
+fontWeight: '600'
+}}
+>
+Add Prescription
+</button>
+</form>
 </div>
 </div>
 );
