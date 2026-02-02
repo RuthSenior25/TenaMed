@@ -2831,6 +2831,7 @@ View Deliveries
 const SupplierDashboard = () => {
 const navigate = useNavigate();
 const { logout, user } = useAuth();
+const { addShipment } = useSupplyChain();
 const [activePanel, setActivePanel] = useState('overview');
 const [products, setProducts] = useState([]);
 const [orders, setOrders] = useState([]);
@@ -2859,7 +2860,7 @@ const fetchSupplierData = async () => {
     const token = localStorage.getItem('token');
     
     // Fetch products, orders, analytics, and pharmacies in parallel
-    const [productsRes, ordersRes, analyticsRes, pharmaciesRes, supplierOrdersRes] = await Promise.all([
+    const [productsRes, ordersRes, analyticsRes, pharmaciesRes] = await Promise.all([
       fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/products`, {
         headers: { 'Authorization': `Bearer ${token}` }
       }),
@@ -2869,7 +2870,7 @@ const fetchSupplierData = async () => {
       fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/supplier/analytics`, {
         headers: { 'Authorization': `Bearer ${token}` }
       }),
-      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/users?role=pharmacy&isApproved=true`, {
+      fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/auth/approved-pharmacies`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
     ]);
@@ -2878,27 +2879,21 @@ const fetchSupplierData = async () => {
     const ordersData = await ordersRes.json();
     const analyticsData = await analyticsRes.json();
     const pharmaciesData = await pharmaciesRes.json();
-    const supplierOrdersData = await supplierOrdersRes.json();
 
     if (productsData.success) {
-      setProducts(productsData.data);
+      setProducts(productsData.data || []);
     }
     
     if (ordersData.success) {
-      setOrders(ordersData.data);
+      setOrders(ordersData.data || []);
     }
     
     if (analyticsData.success) {
-      setAnalytics(analyticsData.data);
+      setAnalytics(analyticsData.data || analytics);
     }
     
     if (pharmaciesData.success) {
       setPharmacies(pharmaciesData.data || []);
-    }
-    
-    if (supplierOrdersData.success) {
-      // Add supplier orders to the orders array for display
-      setOrders(prev => [...prev, ...supplierOrdersData.data]);
     }
   } catch (error) {
     console.error('Error fetching supplier data:', error);
