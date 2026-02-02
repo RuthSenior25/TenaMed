@@ -5300,12 +5300,13 @@ const DeliveryDashboard = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/accept-order/${orderId}`, {
-        method: 'POST',
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/${orderId}/status`, {
+        method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ status: 'assigned' })
       });
       const data = await response.json();
       if (data.success) {
@@ -5316,6 +5317,8 @@ const DeliveryDashboard = () => {
               : order
           )
         );
+      } else {
+        alert(data.message || 'Failed to accept order');
       }
     } catch (error) {
       console.error('Error accepting order:', error);
@@ -5329,12 +5332,13 @@ const DeliveryDashboard = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/start-delivery/${orderId}`, {
-        method: 'POST',
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/${orderId}/status`, {
+        method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ status: 'in_transit' })
       });
       const data = await response.json();
       if (data.success) {
@@ -5345,6 +5349,8 @@ const DeliveryDashboard = () => {
               : order
           )
         );
+      } else {
+        alert(data.message || 'Failed to start delivery');
       }
     } catch (error) {
       console.error('Error starting delivery:', error);
@@ -5358,12 +5364,13 @@ const DeliveryDashboard = () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/complete-delivery/${orderId}`, {
-        method: 'POST',
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/${orderId}/status`, {
+        method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ status: 'delivered' })
       });
       const data = await response.json();
       if (data.success) {
@@ -5374,6 +5381,8 @@ const DeliveryDashboard = () => {
           setCompletedOrders(prev => [...prev, { ...completedOrder, status: 'completed', completedAt: new Date() }]);
         }
         fetchAnalytics(); // Refresh analytics
+      } else {
+        alert(data.message || 'Failed to complete delivery');
       }
     } catch (error) {
       console.error('Error completing delivery:', error);
