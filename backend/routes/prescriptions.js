@@ -121,7 +121,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Create new prescription (for doctors/admins/patients)
-router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.PATIENT]), async (req, res) => {
+router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.USER]), async (req, res) => {
   try {
     const {
       patientId,
@@ -132,7 +132,7 @@ router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.P
     } = req.body;
 
     // If patient is creating prescription, use their own ID
-    const finalPatientId = req.user.role === 'patient' ? req.user._id : patientId;
+    const finalPatientId = req.user.role === 'user' ? req.user._id : patientId;
 
     // Validate required fields
     if (!finalPatientId || !pharmacyId || !drug || !drug.name || !drug.dosage || !drug.frequency) {
@@ -143,9 +143,9 @@ router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.P
     }
 
     // Verify patient exists (only for non-patient creators)
-    if (req.user.role !== 'patient') {
+    if (req.user.role !== 'user') {
       const patient = await User.findById(finalPatientId);
-      if (!patient || patient.role !== 'patient') {
+      if (!patient || patient.role !== 'user') {
         return res.status(400).json({
           success: false,
           message: 'Invalid patient'
@@ -164,7 +164,7 @@ router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.P
 
     const prescription = new Prescription({
       patientId: finalPatientId,
-      doctorId: req.user.role === 'patient' ? null : req.user._id, // Patients can create prescriptions without a doctor
+      doctorId: req.user.role === 'user' ? null : req.user._id, // Patients can create prescriptions without a doctor
       pharmacyId,
       drug: {
         ...drug,
