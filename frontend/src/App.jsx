@@ -682,7 +682,7 @@ const fetchPrescriptions = async () => {
     });
     const data = await response.json();
     if (data.success) {
-      setPrescriptions(data.prescriptions || []);
+      setPrescriptions(data.data || []);
     }
   } catch (error) {
     console.error('Error fetching prescriptions:', error);
@@ -2100,56 +2100,55 @@ return (
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
 <h4 style={{ margin: '0 0 12px', color: '#1a365d' }}>My Prescriptions</h4>
 <div style={{ display: 'grid', gap: '12px' }}>
-{[
-{ id: 'RX001', drug: 'Amoxicillin 500mg', dosage: '1 tablet twice daily', frequency: 'Every 12 hours', refills: 2, pharmacy: 'Bole City Pharmacy', doctor: 'Dr. Alemu', lastRefill: '2024-01-15', expires: '2024-03-15' },
-{ id: 'RX002', drug: 'Metformin 850mg', dosage: '1 tablet daily', frequency: 'Every morning', refills: 1, pharmacy: 'CMC Community Pharmacy', doctor: 'Dr. Tesfaye', lastRefill: '2024-01-20', expires: '2024-04-20' },
-{ id: 'RX003', drug: 'Lisinopril 10mg', dosage: '1 tablet daily', frequency: 'Every morning', refills: 3, pharmacy: 'Lafto Prime Pharmacy', doctor: 'Dr. Bekele', lastRefill: '2024-01-10', expires: '2024-04-10' }
-].map((prescription) => (
-<div key={prescription.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
+{prescriptions.length === 0 ? (
+<p style={{ margin: 0, color: '#a0aec0' }}>No prescriptions found. Add your first prescription below.</p>
+) : (
+prescriptions.map((prescription) => (
+<div key={prescription._id || prescription.id} style={{ border: '1px solid #edf2f7', borderRadius: '10px', padding: '12px' }}>
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
 <div>
 <div style={{ fontWeight: 600, color: '#2d3748', marginBottom: '4px' }}>
-{prescription.drug} <span style={{ fontSize: '12px', color: '#718096' }}>#{prescription.id}</span>
+{prescription.drug?.name || 'N/A'} <span style={{ fontSize: '12px', color: '#718096' }}>#{prescription._id}</span>
 </div>
 <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
-<strong>Dosage:</strong> {prescription.dosage}
+<strong>Dosage:</strong> {prescription.drug?.dosage || 'N/A'}
 </p>
 <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
-<strong>Frequency:</strong> {prescription.frequency}
+<strong>Frequency:</strong> {prescription.drug?.frequency || 'N/A'}
 </p>
 <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
-<strong>Doctor:</strong> {prescription.doctor}
+<strong>Doctor:</strong> {prescription.doctorId?.profile?.firstName ? `${prescription.doctorId.profile.firstName} ${prescription.doctorId.profile.lastName || ''}` : 'N/A'}
 </p>
 <p style={{ margin: '4px 0', fontSize: '14px', color: '#4a5568' }}>
-<strong>Pharmacy:</strong> {prescription.pharmacy}
+<strong>Pharmacy:</strong> {prescription.pharmacyId?.pharmacyName || 'N/A'}
 </p>
 <p style={{ margin: '4px 0', fontSize: '12px', color: '#718096' }}>
-<strong>Refills remaining:</strong> {prescription.refills} | <strong>Expires:</strong> {prescription.expires}
+<strong>Refills remaining:</strong> {(prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)} | <strong>Prescribed:</strong> {prescription.prescribedDate ? new Date(prescription.prescribedDate).toLocaleDateString() : 'N/A'}
 </p>
 </div>
 <div style={{ textAlign: 'right' }}>
 <span style={{
 padding: '6px 12px',
 borderRadius: '999px',
-background: prescription.refills > 0 ? '#c6f6d5' : '#fed7d7',
-color: prescription.refills > 0 ? '#22543d' : '#742a2a',
+background: ((prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)) > 0 ? '#c6f6d5' : '#fed7d7',
+color: ((prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)) > 0 ? '#22543d' : '#742a2a',
 fontSize: '12px',
 fontWeight: 600,
 }}>
-{prescription.refills > 0 ? `${prescription.refills} Refills` : 'No Refills'}
+{((prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)) > 0 ? `${(prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)} Refills` : 'No Refills'}
 </span>
 </div>
 </div>
 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-{prescription.refills > 0 && (
+{((prescription.drug?.refills || 0) - (prescription.drug?.refillsUsed || 0)) > 0 && (
 <button
 onClick={() => {
-setSelectedPharmacy(approvedPharmacies.find(p => p.pharmacyName === prescription.pharmacy));
+setSelectedPharmacy(approvedPharmacies.find(p => p._id === prescription.pharmacyId?._id));
 setOrderForm({
-medications: [{ name: prescription.drug, quantity: 30, instructions: prescription.dosage }],
+medications: [{ name: prescription.drug?.name || 'N/A', quantity: prescription.drug?.quantity || 30, instructions: prescription.drug?.dosage || 'N/A' }],
 deliveryAddress: { street: '', city: '', kebele: '', postalCode: '' },
 deliveryDate: '',
-notes: `Refill for prescription ${prescription.id} - ${prescription.drug}`
+notes: `Refill for prescription ${prescription._id} - ${prescription.drug?.name || 'N/A'}`
 });
 setShowOrderModal(true);
 }}
@@ -2186,7 +2185,8 @@ Change Pharmacy
 </button>
 </div>
 </div>
-))}
+))
+)}
 </div>
 </div>
 <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
