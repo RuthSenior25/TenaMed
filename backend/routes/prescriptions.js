@@ -120,8 +120,8 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// Create new prescription (for doctors/admins)
-router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT]), async (req, res) => {
+// Create new prescription (for doctors/admins/patients)
+router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT, roles.PATIENT]), async (req, res) => {
   try {
     const {
       patientId,
@@ -131,21 +131,26 @@ router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT]), async
       duration
     } = req.body;
 
+    // If patient is creating prescription, use their own ID
+    const finalPatientId = req.user.role === 'patient' ? req.user._id : patientId;
+
     // Validate required fields
-    if (!patientId || !pharmacyId || !drug || !drug.name || !drug.dosage || !drug.frequency) {
+    if (!finalPatientId || !pharmacyId || !drug || !drug.name || !drug.dosage || !drug.frequency) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
       });
     }
 
-    // Verify patient exists
-    const patient = await User.findById(patientId);
-    if (!patient || patient.role !== 'patient') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid patient'
-      });
+    // Verify patient exists (only for non-patient creators)
+    if (req.user.role !== 'patient') {
+      const patient = await User.findById(finalPatientId);
+      if (!patient || patient.role !== 'patient') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid patient'
+        });
+      }
     }
 
     // Verify pharmacy exists and is approved
@@ -158,8 +163,8 @@ router.post('/', authenticate, checkRole([roles.ADMIN, roles.GOVERNMENT]), async
     }
 
     const prescription = new Prescription({
-      patientId,
-      doctorId: req.user._id,
+      patientId: finalPatientId,
+      doctorId: req.user.role === 'patient' ? null : req.user._id, // Patients can create prescriptions without a doctor
       pharmacyId,
       drug: {
         ...drug,
