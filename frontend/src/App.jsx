@@ -4026,19 +4026,15 @@ const DriverDashboard = () => {
   const fetchDeliveries = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/my-assignments`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
       const data = await response.json();
-      if (data.deliveryRequests) {
-        // Filter deliveries assigned to this delivery person
-        const myDeliveries = data.deliveryRequests.filter(delivery => 
-          delivery.dispatcher && delivery.dispatcher._id === driverProfile?._id
-        );
-        setDeliveries(myDeliveries);
+      if (data.success) {
+        setDeliveries(data.data || []);
       }
     } catch (error) {
       console.error('Error fetching deliveries:', error);
@@ -4073,17 +4069,20 @@ const DriverDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://tenamed-backend.onrender.com/api'}/delivery/${deliveryId}/status`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status })
       });
+      
       const data = await response.json();
-      if (data.deliveryRequest) {
-        fetchDeliveries(); // Refresh deliveries
+      if (data.success) {
         alert('Delivery status updated successfully!');
+        fetchDeliveries(); // Refresh deliveries
+      } else {
+        alert('Failed to update status: ' + (data.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error updating delivery status:', error);

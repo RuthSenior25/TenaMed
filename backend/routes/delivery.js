@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const DeliveryRequest = require('../models/DeliveryRequest');
+const Delivery = require('../models/Delivery');
 const Pharmacy = require('../models/Pharmacy');
 const Inventory = require('../models/Inventory');
 const Notification = require('../models/Notification');
@@ -151,6 +152,98 @@ router.get('/', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Get delivery requests error:', error);
     res.status(500).json({ message: 'Server error while fetching delivery requests' });
+  }
+});
+
+// Get driver's assigned deliveries
+router.get('/my-assignments', authenticate, authorize('delivery_person'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+
+    let filter = { 
+      driverId: req.user._id 
+    };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const sortOptions = { createdAt: -1 };
+
+    const deliveries = await Delivery.find(filter)
+      .populate('orderId', 'medications totalAmount deliveryAddress createdAt')
+      .populate('pharmacyId', 'name address contact')
+      .populate('driverId', 'email profile')
+      .sort(sortOptions)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Delivery.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: deliveries,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit
+      }
+    });
+  } catch (error) {
+    console.error('Get driver assignments error:', error);
+    res.status(500).json({ message: 'Server error while fetching driver assignments' });
+  }
+});
+
+// Update delivery status (driver only)
+router.put('/:id/status', authenticate, authorize('delivery_person'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['assigned', 'picked_up', 'in_transit', 'delivered'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    // Find delivery and verify driver ownership
+    const delivery = await Delivery.findOne({ _id: id, driverId: req.user._id });
+    if (!delivery) {
+      return res.status(404).json({ message: 'Delivery not found or not assigned to you' });
+    }
+
+    // Update delivery status
+    delivery.status = status;
+    
+    // Add timestamps for specific status changes
+    if (status === 'picked_up') {
+      delivery.pickedUpAt = new Date();
+    } else if (status === 'in_transit') {
+      delivery.inTransitAt = new Date();
+    } else if (status === 'delivered') {
+      delivery.deliveredAt = new Date();
+    }
+
+    await delivery.save();
+
+    // Also update the original order status
+    if (delivery.orderId) {
+      await require('../models/Order').findByIdAndUpdate(
+        delivery.orderId,
+        { deliveryStatus: status }
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Delivery status updated successfully',
+      data: delivery
+    });
+  } catch (error) {
+    console.error('Update delivery status error:', error);
+    res.status(500).json({ message: 'Server error while updating delivery status' });
   }
 });
 
