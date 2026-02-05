@@ -524,4 +524,42 @@ router.get('/stats/overview', authenticate, async (req, res) => {
   }
 });
 
+// Get driver's completed deliveries
+router.get('/completed-orders', authenticate, authorize('user'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    let filter = { 
+      driverId: req.user._id,
+      status: 'delivered'
+    };
+
+    const sortOptions = { completedAt: -1 };
+
+    const deliveries = await Delivery.find(filter)
+      .populate('orderId', 'medications totalAmount deliveryAddress createdAt')
+      .populate('pharmacyId', 'name address contact')
+      .populate('driverId', 'email profile')
+      .sort(sortOptions)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Delivery.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: deliveries,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalItems: total,
+        itemsPerPage: limit
+      }
+    });
+  } catch (error) {
+    console.error('Get completed deliveries error:', error);
+    res.status(500).json({ message: 'Server error while fetching completed deliveries' });
+  }
+});
+
 module.exports = router;
