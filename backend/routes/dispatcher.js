@@ -12,7 +12,7 @@ router.get('/pending-drivers', auth.authenticate, auth.checkRole(['dispatcher'])
     console.log('Fetching pending delivery persons for approval...');
     
     const pendingDrivers = await User.find({ 
-      role: 'delivery_person',
+      role: 'user',
       isApproved: false 
     }).select('email profile firstName lastName createdAt vehicleType licensePlate');
 
@@ -214,7 +214,7 @@ router.get('/orders', auth.authenticate, auth.checkRole(['dispatcher']), async (
 router.get('/drivers', auth.authenticate, auth.checkRole(['dispatcher']), async (req, res) => {
   try {
     const drivers = await User.find({ 
-      role: 'delivery_person',
+      role: 'user',
       isApproved: true,
       isAvailable: true 
     }).select('email profile location vehicleType isAvailable');
@@ -387,7 +387,7 @@ router.get('/analytics', auth.authenticate, auth.checkRole(['dispatcher']), asyn
       Delivery.countDocuments({ createdAt: { $gte: startOfWeek }, status: 'delivered' }),
       Delivery.countDocuments({ createdAt: { $gte: startOfMonth }, status: 'delivered' }),
       Delivery.countDocuments({ status: 'delivered' }),
-      User.countDocuments({ role: 'driver', isAvailable: true }),
+      User.countDocuments({ role: 'user', isAvailable: true }),
       Order.countDocuments({ deliveryStatus: 'pending' })
     ]);
 
